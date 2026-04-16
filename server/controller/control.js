@@ -866,7 +866,7 @@ const getClassesPaginated = async (req, res) => {
       queryParams.push(`%${search}%`, `%${search}%`);
     }
 
-    // Status filter based on capacity
+    // Status filter based on capacity//
     if (status === "full") {
       whereConditions.push(`
         c.capacity IS NOT NULL AND 
