@@ -1,5 +1,5 @@
 // middleware/rateLimiter.js
-const rateLimit = require("express-rate-limit");
+const {rateLimit, ipKeyGenerator }= require("express-rate-limit");
 
 // Store failed attempts in memory (you can also use Redis for production)
 const failedAttempts = new Map();
@@ -16,6 +16,42 @@ setInterval(() => {
 }, 3600000);
 
 // Login rate limiter
+// const loginLimiter = rateLimit({
+//   windowMs: 15 * 60 * 1000, // 15 minutes
+//   max: 5, // 5 attempts per window per IP
+//   message: {
+//     error: "Too many login attempts. Please try again after 15 minutes.",
+//   },
+//   standardHeaders: true,
+//   legacyHeaders: false,
+//   skipSuccessfulRequests: true, // Don't count successful logins
+
+//   // FIXED: Proper key generator
+//   keyGenerator: (req) => {
+//     // Get IP address properly (handles IPv6 and proxies)
+//     const ip =
+//       req.ip ||
+//       req.connection?.remoteAddress ||
+//       req.socket?.remoteAddress ||
+//       req.headers["x-forwarded-for"]?.split(",")[0] ||
+//       "unknown";
+
+//     // Get username safely
+//     const username = req.body?.username || "anonymous";
+
+//     // Clean IP address (remove IPv6 prefix if present)
+//     const cleanIp = ip.replace("::ffff:", "");
+
+//     return `${cleanIp}-${username}`;
+//   },
+
+//   // // Optional: Skip rate limiting for health checks
+//   // skip: (req) => {
+//   //   return req.path === "/health" || req.path === "/api/health";
+//   // },
+// });
+
+
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // 5 attempts per window per IP
@@ -25,10 +61,29 @@ const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true, // Don't count successful logins
+
+  // 2. Update your keyGenerator to use ipKeyGenerator
   keyGenerator: (req) => {
-    // Use combination of IP and username for more precise tracking
+    // Get username safely (still useful for your combined key)
     const username = req.body?.username || "anonymous";
-    return `${req.ip}-${username}`;
+
+    // Get the IP address properly
+    let ip =
+      req.ip ||
+      req.connection?.remoteAddress ||
+      req.socket?.remoteAddress ||
+      req.headers["x-forwarded-for"]?.split(",")[0] ||
+      "unknown";
+
+    // Clean IPv6 prefix if present
+    ip = ip.replace("::ffff:", "");
+
+    // 3. Use ipKeyGenerator for the IP part to fix the vulnerability
+    // You can optionally pass a subnet size as the second argument (default is 64)
+    const safeIpKey = ipKeyGenerator(ip, 64);
+
+    // Return the combined key
+    return `${safeIpKey}-${username}`;
   },
 });
 

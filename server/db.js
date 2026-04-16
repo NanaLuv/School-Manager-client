@@ -2,9 +2,18 @@ const mysql = require("mysql2/promise");
 const dotenv = require("dotenv");
 dotenv.config();
 
-const urlDB = process.env.MYSQL_URL || process.env.MYSQL_PUBLIC_URL
 const pool = mysql.createPool({
-  uri: urlDB,
+  host: process.env.MYSQLHOST,
+  port: process.env.MYSQLPORT,
+  user: process.env.MYSQLUSER,
+  password: process.env.MYSQLPASSWORD,
+  database: process.env.MYSQLDATABASE,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  ssl: {
+    rejectUnauthorized: false,
+  },
   // host: process.env.DB_HOST || "localhost",
   // user: process.env.DB_USER,
   // password: process.env.DB_PASSWORD,
@@ -15,4 +24,4 @@ const pool = mysql.createPool({
   // queueLimit: 0,
 });
 
-module.exports = pool
+module.exports = pool;
