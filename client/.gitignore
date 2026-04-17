@@ -5,6 +5,8 @@
 /.pnp
 .pnp.js
 
+REACT_APP_BACKEND_URL=https://school-manager-production-0299.up.railway.app
+
 # testing
 /coverage
 ../server
