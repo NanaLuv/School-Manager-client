@@ -50,7 +50,7 @@ app.use("/uploads/school-logo", express.static("uploads/school-logo"));
 //   });
 // }
 
-const port =process.env.MYSQLPORT || process.env.SERVER_PORT;
+const port = process.env.MYSQLPORT || process.env.SERVER_PORT;
 
 async function testConnection() {
   try {

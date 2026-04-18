@@ -56,13 +56,17 @@ const YearTermSettings = () => {
     { value: "year_label", label: "Year Label" },
   ];
 
-  const getAcademicYearsData = async () => {
+  const getAcademicYearsData = async (
+    page = pagination.page,
+    limit = pagination.limit,
+    currentFilters = filters,
+  ) => {
     setLoading(true);
     try {
       const params = {
-        page: pagination.page,
-        limit: pagination.limit,
-        ...filters,
+        page,
+        limit,
+        ...currentFilters,
       };
 
       const response = await api.get("/getacademicyearspaginated", {
@@ -82,8 +86,8 @@ const YearTermSettings = () => {
   };
 
   useEffect(() => {
-    getAcademicYearsData();
-  }, [pagination.page, filters]);
+    getAcademicYearsData(pagination.page, pagination.limit, filters);
+  }, [pagination.page, pagination.limit, filters]);
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= pagination.totalPages) {
