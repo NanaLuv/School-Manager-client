@@ -10,50 +10,64 @@ const app = express();
 
 // cors configuration to allow requests from the frontend URL
 
-app.use(
-  cors({
-    origin: "https://school-manager-rhab.vercel.app",
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  }),
-);
-app.get("/test", (req, res) => {
-  res.json({ message: "CORS working" });
-});
-app.use(express.json());
-// app.use("/schmgt", router);
-app.use("/uploads", express.static("uploads"));
-app.use("/uploads/school-logo", express.static("uploads/school-logo"));
+// app.use(
+//   cors({
+//     origin: "https://school-manager-rhab.vercel.app",
+//     methods: ["GET", "POST", "PUT", "DELETE"],
+//     allowedHeaders: ["Content-Type", "Authorization"],
+//   }),
+// );
+// app.get("/test", (req, res) => {
+//   res.json({ message: "CORS working" });
+// });
+// app.use(express.json());
+// // app.use("/schmgt", router);
+// app.use("/uploads", express.static("uploads"));
+// app.use("/uploads/school-logo", express.static("uploads/school-logo"));
 
-// For production, serve static files if needed
-// if (process.env.NODE_ENV === "production") {
-//   // app.use(express.static(path.join(__dirname, "../client/build")));
-//   app.get("*", (req, res) => {
-//     // res.sendFile(path.join(__dirname, "../client/build", "index.html"));
-//   });
+// // For production, serve static files if needed
+// // if (process.env.NODE_ENV === "production") {
+// //   // app.use(express.static(path.join(__dirname, "../client/build")));
+// //   app.get("*", (req, res) => {
+// //     // res.sendFile(path.join(__dirname, "../client/build", "index.html"));
+// //   });
+// // }
+
+// const port = process.env.PORT || process.env.SERVER_PORT || 5000;
+
+// async function testConnection() {
+//   try {
+//     const connection = await pool.getConnection();
+//     console.log("Database connected successfully");
+//     connection.release();
+//   } catch (err) {
+//     console.error("Database connection failed:", err);
+//     // process.exit(1);
+//     console.error("DB failed, but keeping server alive");
+//   }
 // }
 
-const port = process.env.PORT || process.env.SERVER_PORT || 5000;
+// app.get("/", (req, res) => {
+//   res.send("API is running");
+// });
 
-async function testConnection() {
-  try {
-    const connection = await pool.getConnection();
-    console.log("Database connected successfully");
-    connection.release();
-  } catch (err) {
-    console.error("Database connection failed:", err);
-    // process.exit(1);
-    console.error("DB failed, but keeping server alive");
-  }
-}
+// app.listen(port, "0.0.0.0", () => {
+//   console.log("Server running on port " + port);
+//   testConnection();
+// });
+
+const express = require("express");
+
+// const app = express();
 
 app.get("/", (req, res) => {
-  res.send("API is running");
+  res.send("Server is alive");
 });
+
+const port = process.env.PORT || 5000;
 
 app.listen(port, "0.0.0.0", () => {
   console.log("Server running on port " + port);
-  testConnection();
 });
 
 module.exports = app;
