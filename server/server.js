@@ -10,20 +10,20 @@ const app = express();
 
 // cors configuration to allow requests from the frontend URL
 
-// app.use(
-//   cors({
-//     origin: "https://school-manager-rhab.vercel.app",
-//     methods: ["GET", "POST", "PUT", "DELETE"],
-//     allowedHeaders: ["Content-Type", "Authorization"],
-//   }),
-// );
-// app.get("/test", (req, res) => {
-//   res.json({ message: "CORS working" });
-// });
+app.use(
+  cors({
+    origin: "https://school-manager-rhab.vercel.app",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
+app.get("/test", (req, res) => {
+  res.json({ message: "CORS working" });
+});
 app.use(express.json());
 app.use("/schmgt", router);
-// app.use("/uploads", express.static("uploads"));
-// app.use("/uploads/school-logo", express.static("uploads/school-logo"));
+app.use("/uploads", express.static("uploads"));
+app.use("/uploads/school-logo", express.static("uploads/school-logo"));
 
 // // For production, serve static files if needed
 // // if (process.env.NODE_ENV === "production") {
@@ -51,12 +51,6 @@ app.listen(port, "0.0.0.0", () => {
   console.log("Server running on port " + port);
   testConnection();
 });
-
-
-
-
-
-
 
 // app.listen(port, "0.0.0.0", () => {
 //   console.log("Server running on port " + port);
