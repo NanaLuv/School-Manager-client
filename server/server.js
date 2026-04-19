@@ -8,10 +8,7 @@ dotenv.config();
 
 const app = express();
 
-
-
 // cors configuration to allow requests from the frontend URL
-
 
 app.use(
   cors({
@@ -20,7 +17,9 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
-
+app.get("/test", (req, res) => {
+  res.json({ message: "CORS working" });
+});
 app.use(express.json());
 app.use("/schmgt", router);
 app.use("/uploads", express.static("uploads"));
@@ -34,7 +33,7 @@ app.use("/uploads/school-logo", express.static("uploads/school-logo"));
 //   });
 // }
 
-const port = process.env.MYSQLPORT || process.env.SERVER_PORT;
+const port = process.env.PORT || process.env.SERVER_PORT || 5000;
 
 async function testConnection() {
   try {
@@ -43,7 +42,8 @@ async function testConnection() {
     connection.release();
   } catch (err) {
     console.error("Database connection failed:", err);
-    process.exit(1);
+    // process.exit(1);
+    console.error("DB failed, but keeping server alive");
   }
 }
 
