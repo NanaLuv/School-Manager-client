@@ -21,7 +21,7 @@ app.get("/test", (req, res) => {
   res.json({ message: "CORS working" });
 });
 app.use(express.json());
-app.use("/schmgt", router);
+// app.use("/schmgt", router);
 app.use("/uploads", express.static("uploads"));
 app.use("/uploads/school-logo", express.static("uploads/school-logo"));
 
