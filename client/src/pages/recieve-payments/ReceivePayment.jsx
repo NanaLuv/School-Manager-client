@@ -9,6 +9,7 @@ import {
   DocumentCheckIcon,
   MagnifyingGlassIcon,
   ArrowPathIcon,
+  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import { useNavigate, useLocation } from "react-router-dom";
