@@ -47,6 +47,10 @@ async function testConnection() {
   }
 }
 
+app.get("/", (req, res) => {
+  res.send("API is running");
+});
+
 app.listen(port, "0.0.0.0", () => {
   console.log("Server running on port " + port);
   testConnection();
