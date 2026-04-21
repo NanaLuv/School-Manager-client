@@ -1355,7 +1355,6 @@ const updatePayrollEntry = async (req, res) => {
       deduction_description = "",
     } = req.body;
 
-    console.log("Updating payroll entry:", id, req.body);
 
     // First check if period is processed
     const [periodCheck] = await connection.query(

@@ -37,6 +37,7 @@ const TakeAttendance = () => {
   // Search and filter states
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
 
   // History and export states
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -252,6 +253,14 @@ const TakeAttendance = () => {
         status: student.attendance_status,
         notes: student.attendance_notes || "",
       }));
+
+      // const response = await api.post("/attendance/bulk", {
+      //   attendance_data,
+      //   academic_year_id,
+      //   term_id,
+      //   date: attendanceDate,
+      //   recorded_by,
+      // });
 
       alert("Attendance saved successfully!");
       fetchPreviousAttendance(); // Refresh previous attendance

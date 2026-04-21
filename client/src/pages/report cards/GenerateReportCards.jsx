@@ -54,7 +54,9 @@ const GenerateReportCards = () => {
   const fetchClasses = async () => {
     setLoading(true);
     try {
-      const response = await api.get("/getclasses");
+      const response = await api.get(
+        "/getclasses"
+      );
       setClasses(response.data);
     } catch (error) {
       console.error("Error fetching classes:", error);
@@ -68,12 +70,12 @@ const GenerateReportCards = () => {
     try {
       // Get student count in class
       const studentsRes = await api.get(
-        `/getclasses/${formData.class_id}/students`,
+        `/getclasses/${formData.class_id}/students`
       );
 
       // Check for existing report cards
       const reportCardsRes = await api.get(
-        `/getreportcards?class_id=${formData.class_id}&academic_year_id=${selectedAcademicYear}&term_id=${selectedTerm}`,
+        `/getreportcards?class_id=${formData.class_id}&academic_year_id=${selectedAcademicYear}&term_id=${selectedTerm}`
       );
 
       setClassStats({
@@ -97,7 +99,7 @@ const GenerateReportCards = () => {
 
     try {
       // Get term details first to include dates
-      const termDetails = terms.find((t) => t.id === selectedTerm);
+      const termDetails = terms.find((t) => t.id == selectedTerm);
 
       const payload = {
         ...formData,
@@ -108,13 +110,17 @@ const GenerateReportCards = () => {
         term_end_date: termDetails?.end_date || null,
       };
 
-      const response = await api.post("/generatereportcards", payload);
+
+      const response = await api.post(
+        "/generatereportcards",
+        payload
+      );
 
       setGenerationResults(response.data);
 
       if (response.data.generated > 0) {
         alert(
-          `Successfully generated ${response.data.generated} report cards!`,
+          `Successfully generated ${response.data.generated} report cards!`
         );
       }
 
@@ -314,10 +320,7 @@ const GenerateReportCards = () => {
                   </p>
                   <p className="text-sm text-blue-700">
                     {selectedYear.year_label} • {selectedTermObj.term_name} •{" "}
-                    {
-                      classes.find((c) => c.id === formData.class_id)
-                        ?.class_name
-                    }
+                    {classes.find((c) => c.id == formData.class_id)?.class_name}
                   </p>
                 </div>
               )}

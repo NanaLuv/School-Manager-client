@@ -30,7 +30,6 @@ import {
   ChartPieIcon,
   ArrowLeftEndOnRectangleIcon,
   EnvelopeIcon,
-  EnvelopeOpenIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../pages/contexts/AuthContext";
 
@@ -307,8 +306,8 @@ const Sidebar = () => {
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.subItems &&
         item.subItems.some((sub) =>
-          sub.name.toLowerCase().includes(searchQuery.toLowerCase())
-        ))
+          sub.name.toLowerCase().includes(searchQuery.toLowerCase()),
+        )),
   );
 
   return (
@@ -394,7 +393,7 @@ const Sidebar = () => {
                           ${activeSubmenu === item.name ? "bg-slate-700" : ""}
                           ${
                             location.pathname.startsWith(
-                              `/${item.name.toLowerCase()}`
+                              `/${item.name.toLowerCase()}`,
                             )
                               ? "bg-emerald-500 text-white font-semibold"
                               : ""
@@ -444,7 +443,7 @@ const Sidebar = () => {
                                       {subItem.name}
                                     </button>
                                   </li>
-                                )
+                                ),
                             )}
                           </ul>
                         )}
@@ -481,7 +480,7 @@ const Sidebar = () => {
                       </button>
                     )}
                   </li>
-                )
+                ),
             )}
           </ul>
         </nav>

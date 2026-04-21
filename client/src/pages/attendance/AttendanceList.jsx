@@ -1,9 +1,7 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalendarIcon, PlusIcon } from "@heroicons/react/24/outline";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
-import axios from "axios";
 import { useAcademicData } from "../../hooks/useAcademicContext";
 import api from "../../components/axiosconfig/axiosConfig";
 
@@ -62,9 +60,7 @@ const AttendanceList = () => {
 
   const fetchClasses = async () => {
     try {
-      const classesRes = await api.get(
-        "/getclasses"
-      );
+      const classesRes = await api.get("/getclasses");
       setClasses(classesRes.data);
     } catch (error) {
       console.error("Error fetching classes:", error);
@@ -87,9 +83,7 @@ const AttendanceList = () => {
 
       const [recordsRes, statsRes] = await Promise.all([
         api.get(`/attendance/records?${params}`),
-        api.get(
-          `/attendance/statistics?${params}`
-        ),
+        api.get(`/attendance/statistics?${params}`),
       ]);
 
       setAttendanceRecords(recordsRes.data);
@@ -107,7 +101,7 @@ const AttendanceList = () => {
     }
 
     navigate(
-      `/academics/attendance/take?class_id=${filters.class_id}&academic_year_id=${selectedAcademicYear}&term_id=${selectedTerm}`
+      `/academics/attendance/take?class_id=${filters.class_id}&academic_year_id=${selectedAcademicYear}&term_id=${selectedTerm}`,
     );
   };
 
@@ -354,7 +348,7 @@ const AttendanceList = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                          record.status
+                          record.status,
                         )}`}
                       >
                         {record.status}

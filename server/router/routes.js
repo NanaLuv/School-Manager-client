@@ -340,7 +340,11 @@ router.get("/calculategrade/:score", calculateGrade);
 router.post("/createbulkgrades", authorizeRoles(1, 2), createBulkGrades);
 router.get("/getclasssubjects/:classId/:academicYearId", getClassSubjects);
 router.get("/getgrades", authorizeRoles(1, 2, 3), getGrades);
-router.get("/exportgradetemplate", exportGradeTemplate);
+router.get(
+  "/exportgradetemplate",
+  authorizeRoles(1, 2, 3),
+  exportGradeTemplate,
+);
 router.post(
   "/importgrades",
   authorizeRoles(1, 2),

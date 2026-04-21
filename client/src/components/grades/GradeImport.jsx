@@ -4,7 +4,7 @@ import {
   DocumentArrowDownIcon,
   DocumentArrowUpIcon,
 } from "@heroicons/react/24/outline";
-import axios from "axios";
+import api from "../axiosconfig/axiosConfig";
 
 const GradeImport = ({
   classId,
@@ -25,9 +25,9 @@ const GradeImport = ({
     }
 
     try {
-      const response = await axios.get(
-        `http://localhost:3001/schmgt/exportgradetemplate?class_id=${classId}&subject_id=${selectedSubject}&term_id=${selectedTerm}&academic_year_id=${academicYearId}`,
-        { responseType: "blob" }
+      const response = await api.get(
+        `/exportgradetemplate?class_id=${classId}&subject_id=${selectedSubject}&term_id=${selectedTerm}&academic_year_id=${academicYearId}`,
+        { responseType: "blob" },
       );
 
       // Create download link
@@ -63,11 +63,9 @@ const GradeImport = ({
     formData.append("academic_year_id", academicYearId);
 
     try {
-      const response = await axios.post(
-        "http://localhost:3001/schmgt/importgrades",
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
+      const response = await api.post("/importgrades", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
       setImportResults(response.data);
       alert(`Import completed: ${response.data.message}`);
@@ -79,7 +77,7 @@ const GradeImport = ({
       console.error("Error importing grades:", error);
       alert(
         "Error importing grades: " +
-          (error.response?.data?.error || error.message)
+          (error.response?.data?.error || error.message),
       );
     }
     setImporting(false);

@@ -13,7 +13,6 @@ const getProfitLossData = async (req, res) => {
       include_details = "false",
       category_filter,
     } = req.query;
-
     // Default to current month if no dates provided
     const defaultStartDate =
       start_date ||
@@ -35,7 +34,7 @@ const getProfitLossData = async (req, res) => {
        WHERE stb.is_finalized = TRUE
          AND stb.last_payment_date BETWEEN ? AND ?
          AND stb.paid_amount > 0`,
-      [defaultStartDate, defaultEndDate]
+      [defaultStartDate, defaultEndDate],
     );
 
     // 2. Daily Cash Receipts (Other Income)
@@ -46,7 +45,7 @@ const getProfitLossData = async (req, res) => {
        FROM daily_cash_receipts cr
        LEFT JOIN fee_categories fc ON cr.fee_category_id = fc.id
        WHERE cr.receipt_date BETWEEN ? AND ?`,
-      [defaultStartDate, defaultEndDate]
+      [defaultStartDate, defaultEndDate],
     );
 
     // Get cash receipt details separately if needed
@@ -62,7 +61,7 @@ const getProfitLossData = async (req, res) => {
          WHERE cr.receipt_date BETWEEN ? AND ?
          GROUP BY fc.category_name, cr.source
          ORDER BY amount DESC`,
-        [defaultStartDate, defaultEndDate]
+        [defaultStartDate, defaultEndDate],
       );
       receiptDetails = details;
     }
@@ -81,7 +80,7 @@ const getProfitLossData = async (req, res) => {
          COUNT(DISTINCT e.expense_category) as expense_categories
        FROM expenses e
        WHERE e.expense_date BETWEEN ? AND ?`,
-      [defaultStartDate, defaultEndDate]
+      [defaultStartDate, defaultEndDate],
     );
 
     // Get expense details separately if needed
@@ -97,7 +96,7 @@ const getProfitLossData = async (req, res) => {
          FROM expenses e
          WHERE e.expense_date BETWEEN ? AND ?
          ORDER BY e.expense_date DESC`,
-        [defaultStartDate, defaultEndDate]
+        [defaultStartDate, defaultEndDate],
       );
       expenseDetails = details;
     }
@@ -121,16 +120,19 @@ const getProfitLossData = async (req, res) => {
            OR (pp.start_date <= ? AND pp.end_date >= ?)
          )`,
       [
-        defaultStartDate, defaultEndDate, // start_date BETWEEN
-        defaultStartDate, defaultEndDate, // end_date BETWEEN
-        defaultStartDate, defaultEndDate  // period overlaps
-      ]
+        defaultStartDate,
+        defaultEndDate, // start_date BETWEEN
+        defaultStartDate,
+        defaultEndDate, // end_date BETWEEN
+        defaultStartDate,
+        defaultEndDate, // period overlaps
+      ],
     );
-    
+
     // Get payroll details separately if needed
     let payrollDetails = [];
     let payrollCategoryBreakdown = [];
-    
+
     if (include_details === "true") {
       // Get payroll details with period information
       const [details] = await pool.query(
@@ -158,13 +160,16 @@ const getProfitLossData = async (req, res) => {
            )
          ORDER BY pe.net_salary DESC`,
         [
-          defaultStartDate, defaultEndDate,
-          defaultStartDate, defaultEndDate,
-          defaultStartDate, defaultEndDate
-        ]
+          defaultStartDate,
+          defaultEndDate,
+          defaultStartDate,
+          defaultEndDate,
+          defaultStartDate,
+          defaultEndDate,
+        ],
       );
       payrollDetails = details;
-    
+
       // Get payroll category breakdown
       const [categories] = await pool.query(
         `SELECT 
@@ -186,10 +191,13 @@ const getProfitLossData = async (req, res) => {
          GROUP BY sc.category_name
          ORDER BY amount DESC`,
         [
-          defaultStartDate, defaultEndDate,
-          defaultStartDate, defaultEndDate,
-          defaultStartDate, defaultEndDate
-        ]
+          defaultStartDate,
+          defaultEndDate,
+          defaultStartDate,
+          defaultEndDate,
+          defaultStartDate,
+          defaultEndDate,
+        ],
       );
       payrollCategoryBreakdown = categories;
     }
@@ -278,7 +286,7 @@ const getProfitLossData = async (req, res) => {
        WHERE cr.receipt_date BETWEEN ? AND ?
        GROUP BY COALESCE(fc.category_name, 'Other Income')
        ORDER BY amount DESC`,
-      [defaultStartDate, defaultEndDate, defaultStartDate, defaultEndDate]
+      [defaultStartDate, defaultEndDate, defaultStartDate, defaultEndDate],
     );
 
     const [expenseBreakdown] = await pool.query(
@@ -298,7 +306,7 @@ const getProfitLossData = async (req, res) => {
        WHERE e.expense_date BETWEEN ? AND ?
        GROUP BY e.expense_category
        ORDER BY amount DESC`,
-      [defaultStartDate, defaultEndDate, defaultStartDate, defaultEndDate]
+      [defaultStartDate, defaultEndDate, defaultStartDate, defaultEndDate],
     );
 
     // ==================== PAYROLL CATEGORY BREAKDOWN ====================
@@ -319,9 +327,6 @@ const getProfitLossData = async (req, res) => {
       [defaultStartDate, defaultEndDate],
     );
 
-    // If still empty, try this debug version
-    console.log("Payroll Category Data:", payrollCategoryData);
-
     // ==================== KEY METRICS ====================
 
     // Collection Efficiency
@@ -337,7 +342,7 @@ const getProfitLossData = async (req, res) => {
        FROM student_term_bills stb
        WHERE stb.is_finalized = TRUE
          AND stb.last_payment_date BETWEEN ? AND ?`,
-      [defaultStartDate, defaultEndDate]
+      [defaultStartDate, defaultEndDate],
     );
 
     // Expense to Income Ratio
@@ -390,7 +395,7 @@ const getProfitLossData = async (req, res) => {
         payroll: {
           gross_total: parseFloat(payroll[0]?.total_payroll_gross || 0),
           deductions_total: parseFloat(
-            payroll[0]?.total_payroll_deductions || 0
+            payroll[0]?.total_payroll_deductions || 0,
           ),
           net_total: parseFloat(payroll[0]?.total_payroll_net || 0),
           entries: payroll[0]?.payroll_entries || 0,
@@ -413,7 +418,7 @@ const getProfitLossData = async (req, res) => {
           profit_per_student:
             feeIncome[0]?.fee_paying_students > 0
               ? parseFloat(
-                  (profitLoss / feeIncome[0]?.fee_paying_students).toFixed(2)
+                  (profitLoss / feeIncome[0]?.fee_paying_students).toFixed(2),
                 )
               : 0,
           payroll_percentage:
@@ -422,7 +427,7 @@ const getProfitLossData = async (req, res) => {
                   (
                     ((payroll[0]?.total_payroll_net || 0) / totalIncome) *
                     100
-                  ).toFixed(2)
+                  ).toFixed(2),
                 )
               : 0,
         },
@@ -554,11 +559,11 @@ const exportProfitLossExcel = async (plData, res) => {
 
   res.setHeader(
     "Content-Type",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   );
   res.setHeader(
     "Content-Disposition",
-    `attachment; filename="profit-loss-${plData.period.start_date}-to-${plData.period.end_date}.xlsx"`
+    `attachment; filename="profit-loss-${plData.period.start_date}-to-${plData.period.end_date}.xlsx"`,
   );
   res.send(buffer);
 };
@@ -593,7 +598,7 @@ const exportProfitLossCSV = async (plData, res) => {
   res.setHeader("Content-Type", "text/csv");
   res.setHeader(
     "Content-Disposition",
-    `attachment; filename="profit-loss-${plData.period.start_date}-to-${plData.period.end_date}.csv"`
+    `attachment; filename="profit-loss-${plData.period.start_date}-to-${plData.period.end_date}.csv"`,
   );
   res.send(csvContent);
 };
@@ -606,7 +611,7 @@ const exportProfitLossPDF = async (plData, res) => {
 
   // School Settings
   const [schoolSettings] = await pool.query(
-    "SELECT * FROM school_settings ORDER BY id DESC LIMIT 1"
+    "SELECT * FROM school_settings ORDER BY id DESC LIMIT 1",
   );
   const school = schoolSettings[0] || { school_name: "School Manager Academy" };
 
@@ -622,13 +627,13 @@ const exportProfitLossPDF = async (plData, res) => {
     `Period: ${plData.period.start_date} to ${plData.period.end_date}`,
     pageWidth - 20,
     30,
-    { align: "right" }
+    { align: "right" },
   );
   doc.text(
     `Generated: ${new Date().toLocaleDateString()}`,
     pageWidth - 20,
     35,
-    { align: "right" }
+    { align: "right" },
   );
 
   // Summary Section
@@ -741,7 +746,7 @@ const exportProfitLossPDF = async (plData, res) => {
     `${school.school_name} - Generated by School Manager`,
     pageWidth / 2,
     finalY + 5,
-    { align: "center" }
+    { align: "center" },
   );
 
   const pdfBuffer = Buffer.from(doc.output("arraybuffer"));
@@ -749,7 +754,7 @@ const exportProfitLossPDF = async (plData, res) => {
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
     "Content-Disposition",
-    `attachment; filename="profit-loss-${plData.period.start_date}-to-${plData.period.end_date}.pdf"`
+    `attachment; filename="profit-loss-${plData.period.start_date}-to-${plData.period.end_date}.pdf"`,
   );
   res.send(pdfBuffer);
 };
@@ -853,9 +858,9 @@ const getProfitLossTrends = async (req, res) => {
                 (
                   trends.reduce(
                     (sum, t) => sum + parseFloat(t.total_income),
-                    0
+                    0,
                   ) / trends.length
-                ).toFixed(2)
+                ).toFixed(2),
               )
             : 0,
         avg_monthly_expenses:
@@ -864,9 +869,9 @@ const getProfitLossTrends = async (req, res) => {
                 (
                   trends.reduce(
                     (sum, t) => sum + parseFloat(t.total_expenses),
-                    0
+                    0,
                   ) / trends.length
-                ).toFixed(2)
+                ).toFixed(2),
               )
             : 0,
         avg_monthly_profit:
@@ -875,9 +880,9 @@ const getProfitLossTrends = async (req, res) => {
                 (
                   trends.reduce(
                     (sum, t) => sum + parseFloat(t.profit_loss),
-                    0
+                    0,
                   ) / trends.length
-                ).toFixed(2)
+                ).toFixed(2),
               )
             : 0,
         profitable_months: trends.filter((t) => parseFloat(t.profit_loss) > 0)

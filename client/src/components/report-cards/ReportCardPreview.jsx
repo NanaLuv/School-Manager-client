@@ -80,7 +80,7 @@ const ReportCardPreview = ({ classId, academicYearId, termId }) => {
       }));
       
       // Prepare preview data
-      const student = students.find(s => s.id === studentId);
+      const student = students.find(s => s.id == studentId);
       if (student) {
         setPreviewData({
           student,
@@ -197,7 +197,7 @@ const ReportCardPreview = ({ classId, academicYearId, termId }) => {
                     return (
                       <tr key={grade.subject_id}>
                         <td className="px-3 py-2">
-                          {subjects.find(s => s.id === grade.subject_id)?.subject_name || grade.subject_id}
+                          {subjects.find(s => s.id == grade.subject_id)?.subject_name || grade.subject_id}
                         </td>
                         <td className="px-3 py-2">{parseFloat(grade.class_score || 0).toFixed(1)}</td>
                         <td className="px-3 py-2">{parseFloat(grade.exam_score || 0).toFixed(1)}</td>

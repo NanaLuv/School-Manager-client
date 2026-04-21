@@ -1181,7 +1181,7 @@ const ReceivePayment = () => {
       </div>
 
       {/* Payment History Section */}
-      {selectedStudent && (
+      {/* {selectedStudent && (
         <PaymentHistory
           studentId={selectedStudent?.id}
           academicContext={{
@@ -1189,7 +1189,7 @@ const ReceivePayment = () => {
             term_id: finalizedBill?.term_id,
           }}
         />
-      )}
+      )} */}
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import { DocumentArrowUpIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import * as XLSX from "xlsx";
-import axios from "axios";
+import api from "../axiosconfig/axiosConfig";
 
 const ImportStudentsModal = ({ isOpen, onClose, onImportComplete }) => {
   const [importData, setImportData] = useState([]);
@@ -15,9 +15,7 @@ const ImportStudentsModal = ({ isOpen, onClose, onImportComplete }) => {
   React.useEffect(() => {
     const fetchClasses = async () => {
       try {
-        const response = await axios.get(
-          "http://localhost:3001/schmgt/getclasses"
-        );
+        const response = await api.get("/getclasses");
         setAvailableClasses(response.data);
       } catch (error) {
         console.error("Error fetching classes:", error);
@@ -59,14 +57,14 @@ const ImportStudentsModal = ({ isOpen, onClose, onImportComplete }) => {
             (student) =>
               student.admission_number ||
               student.first_name ||
-              student.last_name
+              student.last_name,
           );
 
         // Validate class names
         const validatedData = mappedData.map((student) => {
           if (student.class_name) {
             const classExists = availableClasses.some(
-              (cls) => cls.class_name === student.class_name
+              (cls) => cls.class_name === student.class_name,
             );
             return {
               ...student,
@@ -93,15 +91,12 @@ const ImportStudentsModal = ({ isOpen, onClose, onImportComplete }) => {
     try {
       // Remove validation fields before sending to backend
       const studentsToImport = importData.map(
-        ({ _classValid, _classError, ...student }) => student
+        ({ _classValid, _classError, ...student }) => student,
       );
 
-      const response = await axios.post(
-        "http://localhost:3001/schmgt/importstudents",
-        {
-          students: studentsToImport,
-        }
-      );
+      const response = await api.post("/importstudents", {
+        students: studentsToImport,
+      });
 
       setResults(response.data);
       setStep(3);
@@ -147,33 +142,23 @@ const ImportStudentsModal = ({ isOpen, onClose, onImportComplete }) => {
         "gender",
         "parent_name",
         "parent_contact",
+        "parent_email",
         "address",
         "enrolled_date",
         "class_name",
       ],
       [
         "ADM001",
-        "John",
-        "Doe",
+        "Nana",
+        "Love",
         "2010-05-15",
         "Male",
-        "Jane Doe",
-        "john.doe@email.com",
+        "Mr Manu",
+        "0241585920",
+        "lovenana@email.com",
         "123 Main St",
         "2024-01-15",
-        "Grade 10A",
-      ],
-      [
-        "ADM002",
-        "Sarah",
-        "Smith",
-        "2011-08-22",
-        "Female",
-        "Mike Smith",
-        "555-0123",
-        "456 Oak Ave",
-        "2024-01-15",
-        "Grade 9B",
+        "Basic 3/3A",
       ],
     ];
 
@@ -185,7 +170,7 @@ const ImportStudentsModal = ({ isOpen, onClose, onImportComplete }) => {
 
   // Count students with invalid classes
   const invalidClassCount = importData.filter(
-    (student) => !student._classValid
+    (student) => !student._classValid,
   ).length;
 
   return (
@@ -278,7 +263,10 @@ const ImportStudentsModal = ({ isOpen, onClose, onImportComplete }) => {
                     name
                   </li>
                   <li>
-                    <strong>parent_contact</strong> (Required) - Phone or email
+                    <strong>parent_contact</strong> (Required) - Phone
+                  </li>
+                  <li>
+                    <strong>parent_contact</strong> (Required) - email
                   </li>
                   <li>
                     <strong>address</strong> (Optional) - Student's address

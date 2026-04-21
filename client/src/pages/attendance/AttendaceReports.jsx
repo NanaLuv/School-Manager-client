@@ -119,7 +119,7 @@ const AttendanceReports = () => {
       link.href = url;
 
       const className =
-        classes.find((c) => c.id === filters.class_id)?.class_name ||
+        classes.find((c) => c.id == filters.class_id)?.class_name ||
         "attendance";
       const extension = format === "excel" ? "xlsx" : "pdf";
 

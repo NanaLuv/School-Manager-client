@@ -10,7 +10,7 @@ import {
   CreditCardIcon,
 } from "@heroicons/react/24/outline";
 import LoadingSpinner from "../common/LoadingSpinner";
-import axios from "axios";
+import api from "../axiosconfig/axiosConfig";
 
 const PaymentHistory = ({ studentId, academicContext }) => {
   const [paymentHistory, setPaymentHistory] = useState([]);
@@ -19,72 +19,70 @@ const PaymentHistory = ({ studentId, academicContext }) => {
   const [expandedPayment, setExpandedPayment] = useState(null);
   const [allocationDetails, setAllocationDetails] = useState({});
 
-//   const fetchPaymentHistory = async () => {
-//     if (!studentId) return;
+  //   const fetchPaymentHistory = async () => {
+  //     if (!studentId) return;
 
-//     setLoading(true);
-//     try {
-//       const response = await axios.get(
-//         `http://localhost:3001/schmgt/getpaymenthistory/${studentId}`
-//       );
-//       setPaymentHistory(response.data);
-//     } catch (error) {
-//       console.error("Error fetching payment history:", error);
-//     }
-//     setLoading(false);
-//   };
+  //     setLoading(true);
+  //     try {
+  //       const response = await api.get(
+  //         `/getpaymenthistory/${studentId}`
+  //       );
+  //       setPaymentHistory(response.data);
+  //     } catch (error) {
+  //       console.error("Error fetching payment history:", error);
+  //     }
+  //     setLoading(false);
+  //   };
 
-const fetchPaymentHistory = async () => {
-  if (!studentId) return;
+  const fetchPaymentHistory = async () => {
+    if (!studentId) return;
 
-  setLoading(true);
-  try {
-    // Get current academic context if not provided
-    let context = academicContext;
-    if (!context) {
-      const [yearsRes, termsRes] = await Promise.all([
-        axios.get("http://localhost:3001/schmgt/getacademicyears"),
-        axios.get("http://localhost:3001/schmgt/getterms"),
-      ]);
-
-      const currentYear = yearsRes.data.find((year) => year.is_current);
-      const today = new Date();
-      const currentTerm = termsRes.data.find((term) => {
-        const start = new Date(term.start_date);
-        const end = new Date(term.end_date);
-        return today >= start && today <= end;
-      });
-
-      context = {
-        academic_year_id: currentYear?.id,
-        term_id: currentTerm?.id,
-      };
-    }
-
-    // Fetch payments for CURRENT TERM only
-    const response = await axios.get(
-      `http://localhost:3001/schmgt/getpaymenthistory/${studentId}?academic_year_id=${context.academic_year_id}&term_id=${context.term_id}`
-    );
-
-    setPaymentHistory(response.data);
-
-    console.log("Payment history for term:", {
-      academic_year_id: context.academic_year_id,
-      term_id: context.term_id,
-      paymentCount: response.data.length,
-    });
-  } catch (error) {
-    console.error("Error fetching payment history:", error);
-  }
-  setLoading(false);
-};
-
-const fetchAllocationDetails = async (paymentId) => {
+    setLoading(true);
     try {
-      const response = await axios.get(
-        `http://localhost:3001/schmgt/getpaymentallocations/${paymentId}`
+      // Get current academic context if not provided
+      let context = academicContext;
+      if (!context) {
+        const [yearsRes, termsRes] = await Promise.all([
+          api.get("/getacademicyears"),
+          api.get("/getterms"),
+        ]);
+
+        const currentYear = yearsRes.data.find((year) => year.is_current);
+        const today = new Date();
+        const currentTerm = termsRes.data.find((term) => {
+          const start = new Date(term.start_date);
+          const end = new Date(term.end_date);
+          return today >= start && today <= end;
+        });
+
+        context = {
+          academic_year_id: currentYear?.id,
+          term_id: currentTerm?.id,
+        };
+      }
+
+      // Fetch payments for CURRENT TERM only
+      const response = await api.get(
+        `/getpaymenthistory/${studentId}?academic_year_id=${context.academic_year_id}&term_id=${context.term_id}`,
       );
-      console.log("allocation details", response.data)
+
+      setPaymentHistory(response.data);
+
+      console.log("Payment history for term:", {
+        academic_year_id: context.academic_year_id,
+        term_id: context.term_id,
+        paymentCount: response.data.length,
+      });
+    } catch (error) {
+      console.error("Error fetching payment history:", error);
+    }
+    setLoading(false);
+  };
+
+  const fetchAllocationDetails = async (paymentId) => {
+    try {
+      const response = await api.get(`/getpaymentallocations/${paymentId}`);
+      console.log("allocation details", response.data);
       setAllocationDetails((prev) => ({
         ...prev,
         [paymentId]: response.data,
@@ -133,7 +131,7 @@ const fetchAllocationDetails = async (paymentId) => {
     const totalAllocated =
       allocationDetails[payment.id]?.reduce(
         (sum, alloc) => sum + parseFloat(alloc.amount_allocated || 0),
-        0
+        0,
       ) || 0;
 
     if (Math.abs(totalAllocated - parseFloat(payment.amount_paid)) < 0.01) {
@@ -149,7 +147,7 @@ const fetchAllocationDetails = async (paymentId) => {
     const totalAllocated =
       allocationDetails[payment.id]?.reduce(
         (sum, alloc) => sum + parseFloat(alloc.amount_allocated || 0),
-        0
+        0,
       ) || 0;
 
     if (Math.abs(totalAllocated - parseFloat(payment.amount_paid)) < 0.01) {
@@ -243,7 +241,7 @@ const fetchAllocationDetails = async (paymentId) => {
                           </div>
                           <div
                             className={`text-xs px-2 py-1 rounded-full ${getStatusColor(
-                              payment
+                              payment,
                             )}`}
                           >
                             {getStatusText(payment)}
@@ -275,7 +273,6 @@ const fetchAllocationDetails = async (paymentId) => {
                           <div className="space-y-3">
                             {allocationDetails[payment.id].map(
                               (allocation, index) => (
-                                
                                 <div
                                   key={allocation.id}
                                   className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border"
@@ -305,7 +302,7 @@ const fetchAllocationDetails = async (paymentId) => {
                                   <div className="text-right">
                                     <div className="text-lg font-semibold text-blue-600">
                                       {formatCurrency(
-                                        allocation.amount_allocated
+                                        allocation.amount_allocated,
                                       )}
                                     </div>
                                     <div className="text-sm text-gray-500">
@@ -318,9 +315,9 @@ const fetchAllocationDetails = async (paymentId) => {
                                           allocation.bill_status === "Paid"
                                             ? "bg-green-100 text-green-800"
                                             : allocation.bill_status ===
-                                              "Partially Paid"
-                                            ? "bg-blue-100 text-blue-800"
-                                            : "bg-gray-100 text-gray-800"
+                                                "Partially Paid"
+                                              ? "bg-blue-100 text-blue-800"
+                                              : "bg-gray-100 text-gray-800"
                                         }`}
                                       >
                                         {allocation.bill_status}
@@ -328,7 +325,7 @@ const fetchAllocationDetails = async (paymentId) => {
                                     )}
                                   </div>
                                 </div>
-                              )
+                              ),
                             )}
 
                             {/* Allocation Summary */}
@@ -342,8 +339,8 @@ const fetchAllocationDetails = async (paymentId) => {
                                     (sum, alloc) =>
                                       sum +
                                       parseFloat(alloc.amount_allocated || 0),
-                                    0
-                                  )
+                                    0,
+                                  ),
                                 )}
                               </div>
                             </div>
@@ -355,13 +352,13 @@ const fetchAllocationDetails = async (paymentId) => {
                               ].reduce(
                                 (sum, alloc) =>
                                   sum + parseFloat(alloc.amount_allocated || 0),
-                                0
+                                0,
                               );
                               const paymentAmount = parseFloat(
-                                payment.amount_paid
+                                payment.amount_paid,
                               );
                               const difference = Math.abs(
-                                totalAllocated - paymentAmount
+                                totalAllocated - paymentAmount,
                               );
 
                               if (difference > 0.01) {
@@ -371,7 +368,7 @@ const fetchAllocationDetails = async (paymentId) => {
                                       <span>Unallocated Amount:</span>
                                       <span className="font-semibold">
                                         {formatCurrency(
-                                          paymentAmount - totalAllocated
+                                          paymentAmount - totalAllocated,
                                         )}
                                       </span>
                                     </div>
@@ -475,8 +472,8 @@ const fetchAllocationDetails = async (paymentId) => {
                       {formatCurrency(
                         paymentHistory.reduce(
                           (sum, p) => sum + parseFloat(p.amount_paid),
-                          0
-                        )
+                          0,
+                        ),
                       )}
                     </div>
                     <div className="text-gray-600">Total Amount Paid</div>
@@ -485,7 +482,7 @@ const fetchAllocationDetails = async (paymentId) => {
                     <div className="text-2xl font-bold text-purple-600">
                       {
                         paymentHistory.filter(
-                          (p) => allocationDetails[p.id]?.length > 0
+                          (p) => allocationDetails[p.id]?.length > 0,
                         ).length
                       }
                     </div>

@@ -34,7 +34,6 @@ const StudentsList = () => {
   const [totalItems, setTotalItems] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [hasPrevPage, setHasPrevPage] = useState(false);
-
   const [showAllStudents, setShowAllStudents] = useState(false);
   const [classes, setClasses] = useState([]);
   const [loadingClasses, setLoadingClasses] = useState(false);

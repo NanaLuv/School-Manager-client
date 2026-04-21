@@ -31,7 +31,7 @@ const ProfitLoss = () => {
 
   // Filters
   const [startDate, setStartDate] = useState(
-    new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1)
   );
   const [endDate, setEndDate] = useState(new Date());
   const [period, setPeriod] = useState("monthly");
@@ -134,7 +134,7 @@ const ProfitLoss = () => {
 
       // Show error message to user
       alert(
-        `Failed to load financial data: ${error.message}. Showing sample data.`,
+        `Failed to load financial data: ${error.message}. Showing sample data.`
       );
     } finally {
       setLoading(false);
@@ -173,10 +173,13 @@ const ProfitLoss = () => {
         end_date: endDate.toISOString().split("T")[0],
       };
 
-      const response = await api.get("/finance/profit-loss/export", {
-        params,
-        responseType: "blob",
-      });
+      const response = await api.get(
+        "/finance/profit-loss/export",
+        {
+          params,
+          responseType: "blob",
+        }
+      );
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
@@ -185,7 +188,7 @@ const ProfitLoss = () => {
         "download",
         `profit-loss-${startDate.toISOString().split("T")[0]}-to-${
           endDate.toISOString().split("T")[0]
-        }.${format}`,
+        }.${format}`
       );
       document.body.appendChild(link);
       link.click();
@@ -212,7 +215,7 @@ const ProfitLoss = () => {
   // Calculate summary stats
   const isProfitable = plData.summary.profit_loss > 0;
   const collectionRate = plData.metrics.collection.rate;
-  // const profitMargin = plData.summary.profit_margin;
+  const profitMargin = plData.summary.profit_margin;
 
   // Helper component to render charts only when loaded
   const ChartContainer = ({ children, height = "h-64" }) => (

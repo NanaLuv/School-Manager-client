@@ -7,8 +7,8 @@ import {
   AcademicCapIcon,
   DocumentArrowDownIcon,
 } from "@heroicons/react/24/outline";
-import axios from "axios";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
+import api from "../axiosconfig/axiosConfig";
 
 const ClassDetails = () => {
   const { id } = useParams();
@@ -25,9 +25,7 @@ const ClassDetails = () => {
   const fetchClassDetails = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(
-        `http://localhost:3001/schmgt/getclasses/${id}/students`
-      );
+      const response = await api.get(`/getclasses/${id}/students`);
       setClassData(response.data);
       setStudents(response.data.students || []);
     } catch (error) {
@@ -39,12 +37,9 @@ const ClassDetails = () => {
   const handleExportStudents = async () => {
     setExporting(true);
     try {
-      const response = await axios.get(
-        `http://localhost:3001/schmgt/getclasses/${id}/export-students`,
-        {
-          responseType: "blob",
-        }
-      );
+      const response = await api.get(`/getclasses/${id}/export-students`, {
+        responseType: "blob",
+      });
 
       // Create download link
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -195,8 +190,8 @@ const ClassDetails = () => {
                 classData.capacity_status === "error"
                   ? "text-red-600"
                   : classData.capacity_status === "warning"
-                  ? "text-orange-600"
-                  : "text-green-600"
+                    ? "text-orange-600"
+                    : "text-green-600"
               }`}
             >
               {classData.capacity_percentage || "No limit"}
@@ -308,8 +303,8 @@ const ClassDetails = () => {
                           student.promotion_status === "Promoted"
                             ? "bg-green-100 text-green-800"
                             : student.promotion_status === "Not Promoted"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-yellow-100 text-yellow-800"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-yellow-100 text-yellow-800"
                         }`}
                       >
                         {student.promotion_status || "Pending"}

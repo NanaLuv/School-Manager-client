@@ -4,7 +4,6 @@ import Modal from "../../components/common/Modal";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import TeacherForm from "../../components/teachers/TeacherForm";
 import TeacherTable from "../../components/teachers/TeacherTable";
-import axios from "axios";
 import api from "../../components/axiosconfig/axiosConfig";
 
 const TeacherList = () => {
@@ -16,9 +15,7 @@ const TeacherList = () => {
   const getTeachers = async () => {
     setLoading(true);
     try {
-      const response = await api.get(
-        "/getteachers"
-      );
+      const response = await api.get("/getteachers");
       setTeachers(response.data);
     } catch (error) {
       console.error("Error fetching teachers:", error);
@@ -43,9 +40,7 @@ const TeacherList = () => {
   const handleDeleteTeacher = async (teacherId) => {
     if (window.confirm("Are you sure you want to delete this teacher?")) {
       try {
-        await api.delete(
-          `/deleteteacher/${teacherId}`
-        );
+        await api.delete(`/deleteteacher/${teacherId}`);
         getTeachers();
       } catch (error) {
         console.error("Error deleting teacher:", error);
@@ -56,15 +51,9 @@ const TeacherList = () => {
   const handleSaveTeacher = async (teacherData) => {
     try {
       if (editingTeacher) {
-        await api.put(
-          `/updateteacher/${editingTeacher.id}`,
-          teacherData
-        );
+        await api.put(`/updateteacher/${editingTeacher.id}`, teacherData);
       } else {
-        await api.post(
-          "/createteacher",
-          teacherData
-        );
+        await api.post("/createteacher", teacherData);
       }
       setIsModalOpen(false);
       getTeachers();
