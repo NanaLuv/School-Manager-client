@@ -2,9 +2,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL:
-    `${process.env.REACT_APP_BACKEND_URL}/schmgt`
-    // "http://localhost:3001/schmgt",
+  baseURL: `${process.env.REACT_APP_BACKEND_URL}/schmgt`,
 });
 
 // Request interceptor - adds token to every request
