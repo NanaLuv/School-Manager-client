@@ -13,6 +13,7 @@ import LoadingSpinner from "../../components/common/LoadingSpinner";
 import ViewEntriesModal from "./ViewEntriesModal";
 import api from "../../components/axiosconfig/axiosConfig";
 
+
 const PayrollPeriods = () => {
   const [periods, setPeriods] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -71,7 +72,7 @@ const PayrollPeriods = () => {
     try {
       // Fetch the PDF with token via your axios instance
       const response = await api.get(`/payroll/report/${periodId}`, {
-        responseType: "blob", // Important: tells axios to treat the response as binary data
+        responseType: "blob", 
       });
 
       // Create a temporary URL for the blob

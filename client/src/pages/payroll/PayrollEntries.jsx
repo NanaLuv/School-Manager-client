@@ -19,6 +19,9 @@ import Modal from "../../components/common/Modal";
 import CreateEntryForm from "./CreateEntryForm";
 import EditEntryForm from "./EditEntryForm";
 import api from "../../components/axiosconfig/axiosConfig";
+import { useAuth } from "../contexts/AuthContext";
+
+
 
 const PayrollEntries = () => {
   const [entries, setEntries] = useState([]);
@@ -33,6 +36,7 @@ const PayrollEntries = () => {
   const [selectedEntries, setSelectedEntries] = useState([]);
   const [isBulkApproveModalOpen, setIsBulkApproveModalOpen] = useState(false);
   const [isSelectAll, setIsSelectAll] = useState(false);
+  const { user } = useAuth();
 
   const monthNames = [
     "January",
@@ -75,6 +79,7 @@ const PayrollEntries = () => {
     setLoading(true);
     try {
       const response = await api.get(`/payroll/entries/${selectedPeriod}`);
+      console.log("Fetched entries response:", response.data);
       setEntries(response.data?.entries || []);
       setSummary(response.data?.summary || {});
     } catch (error) {
@@ -89,23 +94,87 @@ const PayrollEntries = () => {
     setEditModalOpen(true);
   };
 
+
   const handleViewPayslip = async (entryId) => {
+    console.log("Viewing payslip for entry ID:", entryId);
     try {
-      window.open(`/payroll/payslip/${entryId}`, "_blank");
+      setLoading(true);
+      const response = await api.get(`/payroll/payslip/${entryId}`, {
+        responseType: "blob",
+      });
+
+      // Create blob URL for the PDF
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+
+      // Open in new tab OR set for modal
+      window.open(url, "_blank");
+
+      // Clean up
+      setTimeout(() => URL.revokeObjectURL(url), 100);
     } catch (error) {
       console.error("Error viewing payslip:", error);
-      alert("Failed to open payslip");
+      alert("Failed to load payslip");
+    } finally {
+      setLoading(false);
     }
   };
+  
+
+ 
 
   const handleDownloadReport = async () => {
     try {
-      window.open(`/payroll/report/${selectedPeriod}`, "_blank");
+      if (!selectedPeriod) {
+        alert("Please select a payroll period first");
+        return;
+      }
+
+      // Get period info for filename
+      const period = periods.find((p) => p.id === parseInt(selectedPeriod));
+      const monthNames = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ];
+      const fileName = `payroll-report-${monthNames[period.period_month - 1]}-${period.period_year}.pdf`;
+
+      // Fetch the PDF report
+      const response = await api.get(`/payroll/report/${selectedPeriod}`, {
+        responseType: "blob",
+      });
+
+      // Create download link
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+
+      // Create temporary link and trigger download
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Clean up
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error downloading report:", error);
-      alert("Failed to download payroll report");
+      alert(
+        "Failed to download payroll report. Please check if the backend endpoint exists.",
+      );
     }
   };
+
 
   const handleApproveEntry = async (entryId) => {
     if (!window.confirm("Are you sure you want to approve this payroll entry?"))
@@ -113,7 +182,7 @@ const PayrollEntries = () => {
 
     try {
       await api.put(`/payroll/approve/${entryId}`, {
-        approved_by: 1, // Get from auth context
+        approved_by: user.id, 
         payment_date: new Date().toISOString().split("T")[0],
         payment_method: "Bank Transfer",
         payment_reference: `PAY-${Date.now()}`,
@@ -200,7 +269,7 @@ const PayrollEntries = () => {
     try {
       const response = await api.post("/payroll/approve-bulk", {
         entry_ids: selectedEntries,
-        approved_by: 1, // Get from auth context
+        approved_by: user.id, // Get from auth context
         payment_date: new Date().toISOString().split("T")[0],
         payment_method: "Bank Transfer",
         payment_reference: `BULK-${Date.now()}`,
@@ -590,7 +659,9 @@ const PayrollEntries = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => handleViewPayslip(entry.id)}
+                          onClick={() =>
+                            handleViewPayslip(entry.id)
+                          }
                           className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
                           title="View Payslip"
                         >

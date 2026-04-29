@@ -501,7 +501,7 @@ const Dashboard = () => {
                       Low attendance rate ({stats.today.attendance.rate}%)
                     </p>
                     <a
-                      href="/attendance"
+                      href="/academics/attendance"
                       className="text-xs text-amber-600 hover:underline"
                     >
                       Check attendance →

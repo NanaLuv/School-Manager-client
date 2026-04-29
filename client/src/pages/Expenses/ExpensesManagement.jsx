@@ -8,286 +8,77 @@ import {
   ArrowDownTrayIcon,
   TrashIcon,
   PencilIcon,
-  ReceiptRefundIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  ClockIcon,
   BanknotesIcon,
   UserIcon,
   TagIcon,
+  TrashIcon as TrashIconOutline,
 } from "@heroicons/react/24/outline";
 import api from "../../components/axiosconfig/axiosConfig";
-
 import { useAuth } from "../contexts/AuthContext";
 
 const ExpensesManagement = () => {
-  // Form state
   const { user } = useAuth();
 
-  const [formData, setFormData] = useState({
-    expense_category: "",
-    amount: "",
-    expense_date: new Date().toISOString().split("T")[0],
+  // PV Form state
+  const [pvFormData, setPvFormData] = useState({
+    pv_date: new Date().toISOString().split("T")[0],
     description: "",
     paid_to: "",
     payment_method: "Cash",
     reference_number: "",
-    voucher_number: "",
+    items: [],
   });
 
+  // Item form for adding/editing within PV
+  const [itemForm, setItemForm] = useState({
+    expense_category: "",
+    quantity: 1,
+    unit_price: "",
+    description: "",
+  });
+  const [editingItemIndex, setEditingItemIndex] = useState(null);
+
   // UI state
-  const [expenses, setExpenses] = useState([]);
+  const [pvHeaders, setPvHeaders] = useState([]);
+  const [selectedPV, setSelectedPV] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [categories, setCategories] = useState([]);
-  const [view, setView] = useState("entries");
-  const [showForm, setShowForm] = useState(false);
+  const [view, setView] = useState("list"); // list, form, detail
   const [editingId, setEditingId] = useState(null);
   const [filters, setFilters] = useState({
     start_date: new Date().toISOString().split("T")[0],
     end_date: new Date().toISOString().split("T")[0],
-    expense_category: "",
+    status: "",
     paid_to: "",
   });
   const [statistics, setStatistics] = useState({});
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportOptions, setExportOptions] = useState({
     format: "excel",
-    includeSummary: true,
   });
 
-  // Load initial data
-  useEffect(() => {
-    fetchExpenses();
-    fetchStatistics();
-  }, []);
-
-  const fetchExpenses = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get("/expenses", {
-        params: { ...filters, limit: 50 },
-      });
-      console.log("Fetched expenses:", response.data);
-      setExpenses(response.data.expenses || []);
-      setCategories(response.data.categories || []);
-    } catch (error) {
-      console.error("Error loading expenses:", error);
-      alert("Error loading expenses");
-    } finally {
-      setLoading(false);
-    }
+  // Status badge colors
+  const statusColors = {
+    Draft: "bg-yellow-100 text-yellow-800",
+    Approved: "bg-green-100 text-green-800",
+    Paid: "bg-blue-100 text-blue-800",
+    Rejected: "bg-red-100 text-red-800",
   };
 
-  const fetchStatistics = async () => {
-    try {
-      const today = new Date().toISOString().split("T")[0];
-      const response = await api.get("/expenses/statistics", {
-        params: { start_date: today, end_date: today },
-      });
-      setStatistics(response.data.overview || {});
-    } catch (error) {
-      console.error("Error loading statistics:", error);
-    }
-  };
-
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-  //   setLoading(true);
-  //   try {
-  //     // Don't send voucher_number if it's empty
-  //     const submitData = { ...formData};
-  //     console.log("Submitting form with data:", submitData);
-  //     if (
-  //       !submitData.voucher_number ||
-  //       submitData.voucher_number.trim() === ""
-  //     ) {
-  //       delete submitData.voucher_number;
-  //     }
-
-  //     if (editingId) {
-  //       await api.put(`/expenses/${editingId}`, submitData);
-  //       alert("Expense updated successfully!");
-  //       setEditingId(null);
-  //     } else {
-  //       await api.post("/expenses", submitData);
-  //       alert("Expense recorded successfully!");
-  //     }
-
-  //     // Reset form
-  //     setFormData({
-  //       expense_category: "",
-  //       amount: "",
-  //       expense_date: new Date().toISOString().split("T")[0],
-  //       description: "",
-  //       paid_to: "",
-  //       payment_method: "Cash",
-  //       reference_number: "",
-  //       voucher_number: "", // Keep this empty
-  //       recorded_by: user.role_id || 1,
-  //     });
-  //     setShowForm(false);
-
-  //     // Refresh data
-  //     fetchExpenses();
-  //     fetchStatistics();
-  //   } catch (error) {
-  //     console.error("Error saving expense:", error);
-
-  //     // Special handling for database schema errors
-  //     if (error.response?.data?.error?.includes("Database schema mismatch")) {
-  //       alert(
-  //         "Database needs update. Please run the SQL query to add voucher_number column to expenses table.",
-  //       );
-  //     } else {
-  //       alert(error.response?.data?.error || "Error saving expense");
-  //     }
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const recordedById = user.id || 1;
-
-      const submitData = {
-        ...formData,
-        recorded_by: parseInt(recordedById),
-      };
-
-      if (
-        !submitData.voucher_number ||
-        submitData.voucher_number.trim() === ""
-      ) {
-        delete submitData.voucher_number;
-      }
-
-      if (editingId) {
-        await api.put(`/expenses/${editingId}`, submitData);
-        alert("Expense updated successfully!");
-        setEditingId(null);
-      } else {
-        await api.post("/expenses", submitData);
-        alert("Expense recorded successfully!");
-      }
-
-      setFormData({
-        expense_category: "",
-        amount: "",
-        expense_date: new Date().toISOString().split("T")[0],
-        description: "",
-        paid_to: "",
-        payment_method: "Cash",
-        reference_number: "",
-        voucher_number: "",
-      });
-      setShowForm(false);
-
-      fetchExpenses();
-      fetchStatistics();
-    } catch (error) {
-      console.error("Error saving expense:", error);
-      alert(error.response?.data?.error || "Error saving expense");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEdit = (expense) => {
-    setFormData({
-      expense_category: expense.expense_category,
-      amount: expense.amount,
-      expense_date: expense.expense_date.split("T")[0],
-      description: expense.description,
-      paid_to: expense.paid_to,
-      payment_method: expense.payment_method || "Cash",
-      reference_number: expense.reference_number || "",
-      voucher_number: expense.voucher_number || "",
-      recorded_by: expense.recorded_by,
-    });
-    setEditingId(expense.id);
-    setShowForm(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this expense?"))
-      return;
-
-    try {
-      await api.delete(`/expenses/${id}`);
-      fetchExpenses();
-      fetchStatistics();
-      alert("Expense deleted successfully!");
-    } catch (error) {
-      console.error("Error deleting expense:", error);
-      alert("Error deleting expense");
-    }
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const formatCurrency = (amount) => {
-    return `Ghc ${parseFloat(amount || 0).toFixed(2)}`;
-  };
-
-  const handleExport = async () => {
-    try {
-      const cleanFilters = {};
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value && value !== "" && value !== null && value !== undefined) {
-          cleanFilters[key] = value;
-        }
-      });
-
-      if (!cleanFilters.start_date) {
-        cleanFilters.start_date = new Date().toISOString().split("T")[0];
-      }
-      if (!cleanFilters.end_date) {
-        cleanFilters.end_date = new Date().toISOString().split("T")[0];
-      }
-
-      const params = new URLSearchParams({
-        ...cleanFilters,
-        format: exportOptions.format,
-      });
-
-      const response = await api.get(`/expenses/export?${params}`, {
-        responseType: "blob",
-        timeout: 60000,
-      });
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-
-      const format = exportOptions.format === "excel" ? "xlsx" : "pdf";
-      const filename = `expenses-${
-        new Date().toISOString().split("T")[0]
-      }.${format}`;
-      link.setAttribute("download", filename);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-
-      setShowExportModal(false);
-    } catch (error) {
-      console.error("Error exporting:", error);
-      if (error.response?.status === 404) {
-        alert("Export route not found. Please check backend routes.");
-      } else {
-        alert(
-          "Error exporting data: " +
-            (error.response?.data?.error || error.message),
-        );
-      }
+  const StatusIcon = ({ status }) => {
+    switch (status) {
+      case "Draft":
+        return <ClockIcon className="w-4 h-4 inline mr-1" />;
+      case "Approved":
+        return <CheckCircleIcon className="w-4 h-4 inline mr-1" />;
+      case "Paid":
+        return <BanknotesIcon className="w-4 h-4 inline mr-1" />;
+      case "Rejected":
+        return <XCircleIcon className="w-4 h-4 inline mr-1" />;
+      default:
+        return null;
     }
   };
 
@@ -308,30 +99,319 @@ const ExpensesManagement = () => {
     "Other",
   ];
 
+  useEffect(() => {
+    fetchPVHeaders();
+    fetchStatistics();
+  }, [filters]);
+
+  const fetchPVHeaders = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get("/pv-headers", {
+        params: { ...filters, limit: 50 },
+      });
+      setPvHeaders(response.data.pv_headers || []);
+    } catch (error) {
+      console.error("Error loading PVs:", error);
+      alert("Error loading PVs");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStatistics = async () => {
+    try {
+      const response = await api.get("/pv-headers/statistics", {
+        params: { start_date: filters.start_date, end_date: filters.end_date },
+      });
+      setStatistics(response.data);
+    } catch (error) {
+      console.error("Error loading statistics:", error);
+    }
+  };
+
+  const fetchPVDetails = async (id) => {
+    try {
+      setLoading(true);
+      const response = await api.get(`/pv-headers/${id}`);
+      setSelectedPV(response.data);
+      setView("detail");
+    } catch (error) {
+      console.error("Error loading PV details:", error);
+      alert("Error loading PV details");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Item management functions
+  const handleAddItem = () => {
+    if (!itemForm.expense_category || !itemForm.unit_price) {
+      alert("Please fill category and unit price");
+      return;
+    }
+
+    const newItem = {
+      expense_category: itemForm.expense_category,
+      quantity: parseFloat(itemForm.quantity) || 1,
+      unit_price: parseFloat(itemForm.unit_price),
+      amount:
+        (parseFloat(itemForm.quantity) || 1) * parseFloat(itemForm.unit_price),
+      description: itemForm.description,
+    };
+
+    if (editingItemIndex !== null) {
+      // Update existing item
+      const updatedItems = [...pvFormData.items];
+      updatedItems[editingItemIndex] = newItem;
+      setPvFormData({ ...pvFormData, items: updatedItems });
+      setEditingItemIndex(null);
+    } else {
+      // Add new item
+      setPvFormData({
+        ...pvFormData,
+        items: [...pvFormData.items, newItem],
+      });
+    }
+
+    // Reset item form
+    setItemForm({
+      expense_category: "",
+      quantity: 1,
+      unit_price: "",
+      description: "",
+    });
+  };
+
+  const handleEditItem = (index) => {
+    const item = pvFormData.items[index];
+    setItemForm({
+      expense_category: item.expense_category,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      description: item.description || "",
+    });
+    setEditingItemIndex(index);
+  };
+
+  const handleRemoveItem = (index) => {
+    const updatedItems = pvFormData.items.filter((_, i) => i !== index);
+    setPvFormData({ ...pvFormData, items: updatedItems });
+    if (editingItemIndex === index) {
+      setEditingItemIndex(null);
+      setItemForm({
+        expense_category: "",
+        quantity: 1,
+        unit_price: "",
+        description: "",
+      });
+    }
+  };
+
+  const handleSubmitPV = async (e) => {
+    e.preventDefault();
+
+    if (pvFormData.items.length === 0) {
+      alert("Please add at least one expense item");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const submitData = {
+        ...pvFormData,
+        recorded_by: user.id || 1,
+      };
+
+      if (editingId) {
+        await api.put(`/pv-headers/${editingId}`, submitData);
+        alert("PV updated successfully!");
+        setEditingId(null);
+      } else {
+        await api.post("/pv-headers", submitData);
+        alert("PV created successfully!");
+      }
+
+      // Reset form
+      setPvFormData({
+        pv_date: new Date().toISOString().split("T")[0],
+        description: "",
+        paid_to: "",
+        payment_method: "Cash",
+        reference_number: "",
+        items: [],
+      });
+      setView("list");
+      fetchPVHeaders();
+      fetchStatistics();
+    } catch (error) {
+      console.error("Error saving PV:", error);
+      alert(error.response?.data?.error || "Error saving PV");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApprove = async (id) => {
+    if (!window.confirm("Approve this PV? Once approved, it cannot be edited."))
+      return;
+
+    try {
+      await api.put(`/pv-headers/${id}/approve`, {
+        approved_by: user.id || 1,
+      });
+      alert("PV approved successfully!");
+      fetchPVHeaders();
+      if (selectedPV?.id === id) {
+        fetchPVDetails(id);
+      }
+    } catch (error) {
+      console.error("Error approving PV:", error);
+      alert(error.response?.data?.error || "Error approving PV");
+    }
+  };
+
+  const handleMarkPaid = async (id) => {
+    if (!window.confirm("Mark this PV as paid?")) return;
+
+    try {
+      await api.put(`/pv-headers/${id}/mark-paid`);
+      alert("PV marked as paid!");
+      fetchPVHeaders();
+      if (selectedPV?.id === id) {
+        fetchPVDetails(id);
+      }
+    } catch (error) {
+      console.error("Error marking PV as paid:", error);
+      alert(error.response?.data?.error || "Error marking PV as paid");
+    }
+  };
+
+  const handleEditPV = async (pv) => {
+    if (pv.status !== "Draft") {
+      alert("Only draft PVs can be edited");
+      return;
+    }
+
+    setEditingId(pv.id);
+    setPvFormData({
+      pv_date: pv.pv_date.split("T")[0],
+      description: pv.description || "",
+      paid_to: pv.paid_to || "",
+      payment_method: pv.payment_method || "Cash",
+      reference_number: pv.reference_number || "",
+      items: pv.items || [],
+    });
+    setView("form");
+  };
+
+  const handleDeletePV = async (id, status) => {
+    if (status !== "Draft") {
+      alert("Only draft PVs can be deleted");
+      return;
+    }
+
+    if (!window.confirm("Delete this PV? This cannot be undone.")) return;
+
+    try {
+      await api.delete(`/pv-headers/${id}`);
+      alert("PV deleted successfully!");
+      fetchPVHeaders();
+      if (selectedPV?.id === id) {
+        setSelectedPV(null);
+        setView("list");
+      }
+    } catch (error) {
+      console.error("Error deleting PV:", error);
+      alert(error.response?.data?.error || "Error deleting PV");
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return `Ghc ${parseFloat(amount || 0).toFixed(2)}`;
+  };
+
+  const getTotalAmount = () => {
+    return pvFormData.items.reduce(
+      (sum, item) => sum + (item.amount || item.quantity * item.unit_price),
+      0,
+    );
+  };
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleExport = async () => {
+    try {
+      const params = new URLSearchParams({
+        start_date: filters.start_date,
+        end_date: filters.end_date,
+        status: filters.status || "",
+        format: exportOptions.format,
+      });
+
+      const response = await api.get(`/pv-headers/export?${params}`, {
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      const ext = exportOptions.format === "excel" ? "xlsx" : "pdf";
+      link.setAttribute(
+        "download",
+        `pvs-${new Date().toISOString().split("T")[0]}.${ext}`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setShowExportModal(false);
+    } catch (error) {
+      console.error("Error exporting:", error);
+      alert("Error exporting data");
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center">
-          <ReceiptRefundIcon className="w-6 h-6 mr-2 text-orange-500" />
-          Expenses & PV Management
+          <BanknotesIcon className="w-6 h-6 mr-2 text-orange-500" />
+          Payment Vouchers (PV)
         </h1>
         <p className="text-gray-600">
-          Record, track, and manage school expenses
+          Create, manage, and track payment vouchers
         </p>
       </div>
 
       {/* Quick Stats Bar */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow border p-4">
           <div className="flex items-center">
             <div className="bg-blue-100 p-2 rounded-full">
-              <CurrencyDollarIcon className="w-5 h-5 text-blue-600" />
+              <DocumentTextIcon className="w-5 h-5 text-blue-600" />
             </div>
             <div className="ml-3">
-              <p className="text-sm text-gray-600">Total Expenses</p>
+              <p className="text-sm text-gray-600">Total PVs</p>
               <p className="text-lg font-semibold">
-                {statistics.total_expenses || 0}
+                {statistics.total_pvs || 0}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow border p-4">
+          <div className="flex items-center">
+            <div className="bg-yellow-100 p-2 rounded-full">
+              <ClockIcon className="w-5 h-5 text-yellow-600" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-gray-600">Draft</p>
+              <p className="text-lg font-semibold">
+                {statistics.draft_count || 0}
               </p>
             </div>
           </div>
@@ -339,7 +419,33 @@ const ExpensesManagement = () => {
         <div className="bg-white rounded-lg shadow border p-4">
           <div className="flex items-center">
             <div className="bg-green-100 p-2 rounded-full">
-              <BanknotesIcon className="w-5 h-5 text-green-600" />
+              <CheckCircleIcon className="w-5 h-5 text-green-600" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-gray-600">Approved</p>
+              <p className="text-lg font-semibold">
+                {statistics.approved_count || 0}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow border p-4">
+          <div className="flex items-center">
+            <div className="bg-purple-100 p-2 rounded-full">
+              <BanknotesIcon className="w-5 h-5 text-purple-600" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-gray-600">Paid</p>
+              <p className="text-lg font-semibold">
+                {statistics.paid_count || 0}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow border p-4">
+          <div className="flex items-center">
+            <div className="bg-green-100 p-2 rounded-full">
+              <CurrencyDollarIcon className="w-5 h-5 text-green-600" />
             </div>
             <div className="ml-3">
               <p className="text-sm text-gray-600">Total Amount</p>
@@ -349,115 +455,14 @@ const ExpensesManagement = () => {
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow border p-4">
-          <div className="flex items-center">
-            <div className="bg-purple-100 p-2 rounded-full">
-              <TagIcon className="w-5 h-5 text-purple-600" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-gray-600">Categories</p>
-              <p className="text-lg font-semibold">
-                {statistics.unique_categories || 0}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow border p-4">
-          <div className="flex items-center">
-            <div className="bg-yellow-100 p-2 rounded-full">
-              <UserIcon className="w-5 h-5 text-yellow-600" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-gray-600">Vendors</p>
-              <p className="text-lg font-semibold">
-                {statistics.unique_vendors || 0}
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Left Column - Form & Quick Actions */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow border p-6 mb-6">
-            <h2 className="text-lg font-semibold mb-4 flex items-center">
-              <PlusIcon className="w-5 h-5 mr-2 text-blue-500" />
-              Quick Actions
-            </h2>
-
-            <button
-              onClick={() => {
-                setShowForm(true);
-                setEditingId(null);
-                setFormData({
-                  expense_category: "",
-                  amount: "",
-                  expense_date: new Date().toISOString().split("T")[0],
-                  description: "",
-                  paid_to: "",
-                  payment_method: "Cash",
-                  reference_number: "",
-                  voucher_number: "",
-                  recorded_by: 1,
-                });
-              }}
-              className="w-full bg-blue-500 text-white px-4 py-3 rounded hover:bg-blue-600 flex items-center justify-center font-medium mb-3"
-            >
-              <PlusIcon className="w-4 h-4 mr-2" />
-              New Expense / PV
-            </button>
-
-            <button
-              onClick={() => setView("reports")}
-              className="w-full bg-green-500 text-white px-4 py-3 rounded hover:bg-green-600 flex items-center justify-center font-medium mb-3"
-            >
-              <ChartBarIcon className="w-4 h-4 mr-2" />
-              View Reports
-            </button>
-
-            <button
-              onClick={() => setShowExportModal(true)}
-              className="w-full bg-purple-500 text-white px-4 py-3 rounded hover:bg-purple-600 flex items-center justify-center font-medium"
-            >
-              <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
-              Export Data
-            </button>
-
-            <div className="mt-6 pt-6 border-t">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">
-                Today's Summary
-              </h3>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Expenses:</span>
-                  <span className="font-medium">
-                    {statistics.total_expenses || 0}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Total:</span>
-                  <span className="font-medium text-green-600">
-                    {formatCurrency(statistics.total_amount)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Average:</span>
-                  <span className="font-medium">
-                    {formatCurrency(statistics.average_amount)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column - Data Table */}
-        <div className="lg:col-span-3">
+      {view === "list" && (
+        <div className="bg-white rounded-lg shadow border">
           {/* Filter Bar */}
-          <div className="bg-white rounded-lg shadow border p-4 mb-6">
-            <div className="flex flex-wrap gap-3">
+          <div className="p-4 border-b">
+            <div className="flex flex-wrap gap-3 items-end">
               <div>
                 <label className="block text-xs font-medium mb-1">From</label>
                 <input
@@ -479,260 +484,280 @@ const ExpensesManagement = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1">
-                  Category
-                </label>
+                <label className="block text-xs font-medium mb-1">Status</label>
                 <select
-                  name="expense_category"
-                  value={filters.expense_category}
+                  name="status"
+                  value={filters.status}
                   onChange={handleFilterChange}
                   className="border p-1 rounded text-sm"
                 >
-                  <option value="">All Categories</option>
-                  {categories.map((cat, index) => (
-                    <option key={index} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
+                  <option value="">All Status</option>
+                  <option value="Draft">Draft</option>
+                  <option value="Approved">Approved</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Rejected">Rejected</option>
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1">Vendor</label>
+                <label className="block text-xs font-medium mb-1">Payee</label>
                 <input
                   type="text"
                   name="paid_to"
                   value={filters.paid_to}
                   onChange={handleFilterChange}
-                  placeholder="Search vendor..."
+                  placeholder="Search payee..."
                   className="border p-1 rounded text-sm"
                 />
               </div>
-              <div className="flex items-end">
+              <div>
                 <button
-                  onClick={fetchExpenses}
+                  onClick={fetchPVHeaders}
                   className="bg-blue-500 text-white px-4 py-1.5 rounded text-sm"
                 >
                   Apply Filters
                 </button>
               </div>
+              <div className="ml-auto flex gap-2">
+                <button
+                  onClick={() => {
+                    setEditingId(null);
+                    setPvFormData({
+                      pv_date: new Date().toISOString().split("T")[0],
+                      description: "",
+                      paid_to: "",
+                      payment_method: "Cash",
+                      reference_number: "",
+                      items: [],
+                    });
+                    setView("form");
+                  }}
+                  className="bg-green-500 text-white px-4 py-1.5 rounded text-sm flex items-center"
+                >
+                  <PlusIcon className="w-4 h-4 mr-1" />
+                  New PV
+                </button>
+                <button
+                  onClick={() => setShowExportModal(true)}
+                  className="bg-purple-500 text-white px-4 py-1.5 rounded text-sm flex items-center"
+                >
+                  <ArrowDownTrayIcon className="w-4 h-4 mr-1" />
+                  Export
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Data Table */}
-          <div className="bg-white rounded-lg shadow border">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h2 className="text-lg font-semibold">Recent Expenses</h2>
-              <span className="text-sm text-gray-500">
-                {expenses.length} record(s)
-              </span>
+          {/* PV Table */}
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+              <p className="mt-2 text-gray-500">Loading...</p>
             </div>
-
-            {loading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-                <p className="mt-2 text-gray-500">Loading expenses...</p>
-              </div>
-            ) : expenses.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <DocumentTextIcon className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                <p>No expenses found</p>
-                <p className="text-sm">Record your first expense above</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="p-3 text-left">Voucher No</th>
-                      <th className="p-3 text-left">Date</th>
-                      <th className="p-3 text-left">Category</th>
-                      <th className="p-3 text-left">Description</th>
-                      <th className="p-3 text-left">Paid To</th>
-                      <th className="p-3 text-right">Amount</th>
-                      <th className="p-3 text-left">Method</th>
-                      <th className="p-3 text-left">Recorded By</th>
-                      <th className="p-3 text-left">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {expenses.map((expense) => (
-                      <tr
-                        key={expense.id}
-                        className="border-b hover:bg-gray-50"
+          ) : pvHeaders.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <DocumentTextIcon className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+              <p>No payment vouchers found</p>
+              <button
+                onClick={() => setView("form")}
+                className="mt-2 text-blue-500 hover:text-blue-700"
+              >
+                Create your first PV
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="p-3 text-left">PV No</th>
+                    <th className="p-3 text-left">Date</th>
+                    <th className="p-3 text-left">Payee</th>
+                    <th className="p-3 text-left">Description</th>
+                    <th className="p-3 text-right">Amount</th>
+                    <th className="p-3 text-left">Status</th>
+                    <th className="p-3 text-left">Items</th>
+                    <th className="p-3 text-left">Recorded By</th>
+                    <th className="p-3 text-left">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pvHeaders.map((pv) => (
+                    <tr key={pv.id} className="border-b hover:bg-gray-50">
+                      <td
+                        className="p-3 font-mono text-xs cursor-pointer text-blue-600 hover:underline"
+                        onClick={() => fetchPVDetails(pv.id)}
                       >
-                        <td className="p-3 font-mono text-xs">
-                          {expense.voucher_number}
-                        </td>
-                        <td className="p-3">
-                          {new Date(expense.expense_date).toDateString()}
-                        </td>
-                        <td className="p-3">
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {expense.expense_category}
-                          </span>
-                        </td>
-                        <td className="p-3 max-w-xs truncate">
-                          {expense.description}
-                        </td>
-                        <td className="p-3">{expense.paid_to}</td>
-                        <td className="p-3 text-right font-medium text-green-600">
-                          {formatCurrency(expense.amount)}
-                        </td>
-                        <td className="p-3">
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            {expense.payment_method}
-                          </span>
-                        </td>
-                        <td className="p-3 text-sm text-gray-500">
-                          {expense.recorded_by_name}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex space-x-2">
+                        {pv.pv_number}
+                      </td>
+                      <td className="p-3">
+                        {new Date(pv.pv_date).toLocaleDateString()}
+                      </td>
+                      <td className="p-3">{pv.paid_to || "-"}</td>
+                      <td className="p-3 max-w-xs truncate">
+                        {pv.description || "-"}
+                      </td>
+                      <td className="p-3 text-right font-medium text-green-600">
+                        {formatCurrency(pv.total_amount)}
+                      </td>
+                      <td className="p-3">
+                        <span
+                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            statusColors[pv.status]
+                          }`}
+                        >
+                          <StatusIcon status={pv.status} />
+                          {pv.status}
+                        </span>
+                      </td>
+                      <td className="p-3 text-center">
+                        <span className="inline-flex items-center justify-center w-6 h-6 bg-gray-100 rounded-full text-xs">
+                          {pv.item_count}
+                        </span>
+                      </td>
+                      <td className="p-3 text-sm text-gray-500">
+                        {pv.recorded_by_name}
+                      </td>
+                      <td className="p-3">
+                        <div className="flex space-x-2">
+                          {pv.status === "Draft" && (
+                            <>
+                              <button
+                                onClick={() => handleEditPV(pv)}
+                                className="text-blue-500 hover:text-blue-700"
+                                title="Edit"
+                              >
+                                <PencilIcon className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeletePV(pv.id, pv.status)}
+                                className="text-red-500 hover:text-red-700"
+                                title="Delete"
+                              >
+                                <TrashIcon className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleApprove(pv.id)}
+                                className="text-green-500 hover:text-green-700"
+                                title="Approve"
+                              >
+                                <CheckCircleIcon className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                          {pv.status === "Approved" && (
                             <button
-                              onClick={() => handleEdit(expense)}
-                              className="text-blue-500 hover:text-blue-700"
-                              title="Edit expense"
+                              onClick={() => handleMarkPaid(pv.id)}
+                              className="text-purple-500 hover:text-purple-700"
+                              title="Mark as Paid"
                             >
-                              <PencilIcon className="w-4 h-4" />
+                              <BanknotesIcon className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => handleDelete(expense.id)}
-                              className="text-red-500 hover:text-red-700"
-                              title="Delete expense"
-                            >
-                              <TrashIcon className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+                          )}
+                          <button
+                            onClick={() => fetchPVDetails(pv.id)}
+                            className="text-gray-500 hover:text-gray-700"
+                            title="View Details"
+                          >
+                            <DocumentTextIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
-      {/* Expense Form Modal */}
-      {showForm && (
+      {/* PV Form Modal */}
+      {view === "form" && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-          <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-semibold text-gray-900">
-                  {editingId ? "Edit Expense" : "New Expense / PCV"}
+                  {editingId ? "Edit Payment Voucher" : "New Payment Voucher"}
                 </h3>
                 <button
-                  onClick={() => setShowForm(false)}
+                  onClick={() => setView("list")}
                   className="text-gray-400 hover:text-gray-500"
                 >
                   ✕
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmitPV}>
+                {/* PV Header Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  {/* Date */}
                   <div>
                     <label className="block text-sm font-medium mb-1">
                       <CalendarIcon className="w-4 h-4 inline mr-1" />
-                      Date *
+                      PV Date *
                     </label>
                     <input
                       type="date"
-                      name="expense_date"
-                      value={formData.expense_date}
-                      onChange={handleInputChange}
+                      value={pvFormData.pv_date}
+                      onChange={(e) =>
+                        setPvFormData({
+                          ...pvFormData,
+                          pv_date: e.target.value,
+                        })
+                      }
                       className="w-full border p-2 rounded"
                       required
                     />
                   </div>
-
-                  {/* Amount */}
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      <CurrencyDollarIcon className="w-4 h-4 inline mr-1" />
-                      Amount (Ghc) *
-                    </label>
-                    <input
-                      type="number"
-                      name="amount"
-                      value={formData.amount}
-                      onChange={handleInputChange}
-                      step="0.01"
-                      min="0.01"
-                      className="w-full border p-2 rounded"
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-
-                  {/* Category */}
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      <TagIcon className="w-4 h-4 inline mr-1" />
-                      Category *
-                    </label>
-                    <select
-                      name="expense_category"
-                      value={formData.expense_category}
-                      onChange={handleInputChange}
-                      className="w-full border p-2 rounded"
-                      required
-                    >
-                      <option value="">Select Category</option>
-                      {commonCategories.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Paid To */}
                   <div>
                     <label className="block text-sm font-medium mb-1">
                       <UserIcon className="w-4 h-4 inline mr-1" />
-                      Paid To *
+                      Payee (Paid To) *
                     </label>
                     <input
                       type="text"
-                      name="paid_to"
-                      value={formData.paid_to}
-                      onChange={handleInputChange}
+                      value={pvFormData.paid_to}
+                      onChange={(e) =>
+                        setPvFormData({
+                          ...pvFormData,
+                          paid_to: e.target.value,
+                        })
+                      }
                       className="w-full border p-2 rounded"
                       placeholder="Vendor/Supplier name"
                       required
                     />
                   </div>
-
-                  {/* Description */}
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium mb-1">
                       <DocumentTextIcon className="w-4 h-4 inline mr-1" />
-                      Description *
+                      Description
                     </label>
                     <textarea
-                      name="description"
-                      value={formData.description}
-                      onChange={handleInputChange}
+                      value={pvFormData.description}
+                      onChange={(e) =>
+                        setPvFormData({
+                          ...pvFormData,
+                          description: e.target.value,
+                        })
+                      }
                       className="w-full border p-2 rounded"
-                      placeholder="Detailed description of the expense"
+                      placeholder="Overall description of this payment"
                       rows="2"
-                      required
                     />
                   </div>
-
-                  {/* Payment Method */}
                   <div>
                     <label className="block text-sm font-medium mb-1">
                       Payment Method
                     </label>
                     <select
-                      name="payment_method"
-                      value={formData.payment_method}
-                      onChange={handleInputChange}
+                      value={pvFormData.payment_method}
+                      onChange={(e) =>
+                        setPvFormData({
+                          ...pvFormData,
+                          payment_method: e.target.value,
+                        })
+                      }
                       className="w-full border p-2 rounded"
                     >
                       <option value="Cash">Cash</option>
@@ -741,35 +766,222 @@ const ExpensesManagement = () => {
                       <option value="Mobile Money">Mobile Money</option>
                     </select>
                   </div>
-
-                  {/* Voucher Number */}
                   <div>
                     <label className="block text-sm font-medium mb-1">
-                      Voucher Number
+                      Reference Number
                     </label>
                     <input
                       type="text"
-                      name="voucher_number"
-                      value={formData.voucher_number}
-                      onChange={handleInputChange}
+                      value={pvFormData.reference_number}
+                      onChange={(e) =>
+                        setPvFormData({
+                          ...pvFormData,
+                          reference_number: e.target.value,
+                        })
+                      }
                       className="w-full border p-2 rounded"
-                      placeholder="Auto-generated if empty"
+                      placeholder="Check no, transfer ref, etc"
                     />
                   </div>
                 </div>
 
+                {/* Expense Items Section */}
+                <div className="border-t pt-6 mb-6">
+                  <h4 className="text-md font-semibold mb-3">Expense Items</h4>
+
+                  {/* Add/Edit Item Form */}
+                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-medium mb-1">
+                          Category *
+                        </label>
+                        <select
+                          value={itemForm.expense_category}
+                          onChange={(e) =>
+                            setItemForm({
+                              ...itemForm,
+                              expense_category: e.target.value,
+                            })
+                          }
+                          className="w-full border p-2 rounded text-sm"
+                        >
+                          <option value="">Select Category</option>
+                          {commonCategories.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">
+                          Quantity
+                        </label>
+                        <input
+                          type="number"
+                          value={itemForm.quantity}
+                          onChange={(e) =>
+                            setItemForm({
+                              ...itemForm,
+                              quantity: e.target.value,
+                            })
+                          }
+                          step="0.01"
+                          className="w-full border p-2 rounded text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">
+                          Unit Price (Ghc) *
+                        </label>
+                        <input
+                          type="number"
+                          value={itemForm.unit_price}
+                          onChange={(e) =>
+                            setItemForm({
+                              ...itemForm,
+                              unit_price: e.target.value,
+                            })
+                          }
+                          step="0.01"
+                          className="w-full border p-2 rounded text-sm"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <button
+                          type="button"
+                          onClick={handleAddItem}
+                          className="bg-blue-500 text-white px-4 py-2 rounded text-sm"
+                        >
+                          {editingItemIndex !== null ? "Update" : "Add Item"}
+                        </button>
+                        {editingItemIndex !== null && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingItemIndex(null);
+                              setItemForm({
+                                expense_category: "",
+                                quantity: 1,
+                                unit_price: "",
+                                description: "",
+                              });
+                            }}
+                            className="ml-2 text-gray-500 px-3 py-2 rounded text-sm"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <label className="block text-xs font-medium mb-1">
+                        Description
+                      </label>
+                      <input
+                        type="text"
+                        value={itemForm.description}
+                        onChange={(e) =>
+                          setItemForm({
+                            ...itemForm,
+                            description: e.target.value,
+                          })
+                        }
+                        className="w-full border p-2 rounded text-sm"
+                        placeholder="Item description (optional)"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Items Table */}
+                  {pvFormData.items.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm border">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="p-2 text-left">Category</th>
+                            <th className="p-2 text-right">Qty</th>
+                            <th className="p-2 text-right">Unit Price</th>
+                            <th className="p-2 text-right">Amount</th>
+                            <th className="p-2 text-left">Description</th>
+                            <th className="p-2 text-center">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pvFormData.items.map((item, index) => (
+                            <tr key={index} className="border-b">
+                              <td className="p-2">{item.expense_category}</td>
+                              <td className="p-2 text-right">
+                                {item.quantity}
+                              </td>
+                              <td className="p-2 text-right">
+                                {formatCurrency(item.unit_price)}
+                              </td>
+                              <td className="p-2 text-right font-medium">
+                                {formatCurrency(
+                                  item.amount ||
+                                    item.quantity * item.unit_price,
+                                )}
+                              </td>
+                              <td className="p-2">{item.description || "-"}</td>
+                              <td className="p-2 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditItem(index)}
+                                  className="text-blue-500 hover:text-blue-700 mr-2"
+                                >
+                                  <PencilIcon className="w-4 h-4 inline" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveItem(index)}
+                                  className="text-red-500 hover:text-red-700"
+                                >
+                                  <TrashIcon className="w-4 h-4 inline" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-gray-50">
+                          <tr>
+                            <td
+                              colSpan="3"
+                              className="p-2 text-right font-bold"
+                            >
+                              TOTAL:
+                            </td>
+                            <td className="p-2 text-right font-bold text-green-600">
+                              {formatCurrency(getTotalAmount())}
+                            </td>
+                            <td colSpan="2"></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500 border-2 border-dashed rounded-lg">
+                      <PlusIcon className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                      <p>No items added yet</p>
+                      <p className="text-sm">Add expense items above</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Form Actions */}
                 <div className="flex justify-end space-x-3 pt-4 border-t">
                   <button
                     type="button"
-                    onClick={() => setShowForm(false)}
+                    onClick={() => setView("list")}
                     className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={loading}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                    disabled={loading || pvFormData.items.length === 0}
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                   >
                     {loading ? (
                       <>
@@ -777,13 +989,172 @@ const ExpensesManagement = () => {
                         Saving...
                       </>
                     ) : editingId ? (
-                      "Update Expense"
+                      "Update PV"
                     ) : (
-                      "Record Expense"
+                      "Create PV"
                     )}
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PV Detail View */}
+      {view === "detail" && selectedPV && (
+        <div className="bg-white rounded-lg shadow border">
+          <div className="p-6 border-b">
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-xl font-bold">{selectedPV.pv_number}</h2>
+                <p className="text-gray-500 mt-1">
+                  {new Date(selectedPV.pv_date).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setView("list")}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg"
+                >
+                  Back to List
+                </button>
+                {selectedPV.status === "Draft" && (
+                  <>
+                    <button
+                      onClick={() => handleEditPV(selectedPV)}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg"
+                    >
+                      <PencilIcon className="w-4 h-4 inline mr-1" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleApprove(selectedPV.id)}
+                      className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg"
+                    >
+                      <CheckCircleIcon className="w-4 h-4 inline mr-1" />
+                      Approve
+                    </button>
+                    <button
+                      onClick={() =>
+                        handleDeletePV(selectedPV.id, selectedPV.status)
+                      }
+                      className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg"
+                    >
+                      <TrashIcon className="w-4 h-4 inline mr-1" />
+                      Delete
+                    </button>
+                  </>
+                )}
+                {selectedPV.status === "Approved" && (
+                  <button
+                    onClick={() => handleMarkPaid(selectedPV.id)}
+                    className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg"
+                  >
+                    <BanknotesIcon className="w-4 h-4 inline mr-1" />
+                    Mark as Paid
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6">
+            {/* PV Info Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div>
+                <p className="text-sm text-gray-500">Status</p>
+                <p>
+                  <span
+                    className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      statusColors[selectedPV.status]
+                    }`}
+                  >
+                    <StatusIcon status={selectedPV.status} />
+                    {selectedPV.status}
+                  </span>
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Payee</p>
+                <p className="font-medium">{selectedPV.paid_to || "-"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Payment Method</p>
+                <p>{selectedPV.payment_method || "Cash"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Reference Number</p>
+                <p className="font-mono text-sm">
+                  {selectedPV.reference_number || "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Recorded By</p>
+                <p>{selectedPV.recorded_by_name}</p>
+              </div>
+              {selectedPV.approved_by_name && (
+                <div>
+                  <p className="text-sm text-gray-500">Approved By</p>
+                  <p>{selectedPV.approved_by_name}</p>
+                  <p className="text-xs text-gray-400">
+                    {selectedPV.approved_at &&
+                      new Date(selectedPV.approved_at).toLocaleString()}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Description */}
+            {selectedPV.description && (
+              <div className="mb-6">
+                <p className="text-sm text-gray-500">Description</p>
+                <p className="mt-1">{selectedPV.description}</p>
+              </div>
+            )}
+
+            {/* Items Table */}
+            <h4 className="font-semibold mb-3">Expense Items</h4>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm border">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="p-3 text-left">Category</th>
+                    <th className="p-3 text-right">Quantity</th>
+                    <th className="p-3 text-right">Unit Price</th>
+                    <th className="p-3 text-right">Amount</th>
+                    <th className="p-3 text-left">Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedPV.items?.map((item, idx) => (
+                    <tr key={idx} className="border-b">
+                      <td className="p-3">{item.expense_category}</td>
+                      <td className="p-3 text-right">{item.quantity}</td>
+                      <td className="p-3 text-right">
+                        {formatCurrency(item.unit_price)}
+                      </td>
+                      <td className="p-3 text-right font-medium">
+                        {formatCurrency(
+                          item.amount || item.quantity * item.unit_price,
+                        )}
+                      </td>
+                      <td className="p-3">{item.description || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-gray-50">
+                  <tr>
+                    <td colSpan="3" className="p-3 text-right font-bold">
+                      TOTAL:
+                    </td>
+                    <td className="p-3 text-right font-bold text-green-600">
+                      {formatCurrency(selectedPV.total_amount)}
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
         </div>
@@ -806,7 +1177,6 @@ const ExpensesManagement = () => {
                 </button>
               </div>
 
-              {/* Format Selection */}
               <div className="mb-6">
                 <h4 className="text-sm font-medium text-gray-700 mb-3">
                   Select Format
@@ -832,9 +1202,7 @@ const ExpensesManagement = () => {
                       </svg>
                     </div>
                     <span className="text-sm font-medium">Excel</span>
-                    <span className="text-xs text-gray-500">.xlsx</span>
                   </button>
-
                   <button
                     onClick={() =>
                       setExportOptions((prev) => ({ ...prev, format: "pdf" }))
@@ -851,17 +1219,14 @@ const ExpensesManagement = () => {
                         fill="currentColor"
                         viewBox="0 0 24 24"
                       >
-                        <path d="M8.267 14.68c-.184 0-.308.018-.372.036v1.178c.076.018.171.023.302.023.479 0 .774-.242.774-.651 0-.366-.254-.586-.704-.586zm3.487.012c-.2 0-.33.018-.407.036v2.61c.077.018.201.018.313.018.817.006 1.349-.444 1.349-1.396 0-.705-.373-1.268-1.255-1.268z" />
-                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-3.666 9.293c0-.757.268-1.304.785-1.643.511-.334 1.24-.514 2.186-.514.949 0 1.683.18 2.201.537.517.357.778.92.778 1.692v3.861h-1.496v-1.02h-.05c-.163.377-.419.669-.767.876-.348.205-.804.308-1.368.308-.644 0-1.148-.152-1.513-.456-.365-.305-.548-.76-.548-1.363 0-.628.192-1.092.577-1.392.385-.3.935-.449 1.649-.449.457 0 .846.061 1.169.184.322.123.569.277.738.462h.05v-1.23h.033c-.012-.213-.081-.405-.207-.574a1.19 1.19 0 00-.524-.396 2.157 2.157 0 00-.801-.137c-.57 0-1.024.153-1.362.46-.339.307-.508.75-.508 1.33h1.503zm4.988 2.963v1.15h-3.595v-1.15h3.595zM14 9h-1V4l5 5h-4z" />
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" />
                       </svg>
                     </div>
                     <span className="text-sm font-medium">PDF</span>
-                    <span className="text-xs text-gray-500">.pdf</span>
                   </button>
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setShowExportModal(false)}

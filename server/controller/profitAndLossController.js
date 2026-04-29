@@ -9,10 +9,11 @@ const getProfitLossData = async (req, res) => {
     const {
       start_date,
       end_date,
-      period = "monthly", // daily, weekly, monthly, quarterly, yearly
+      period = "monthly",
       include_details = "false",
       category_filter,
     } = req.query;
+
     // Default to current month if no dates provided
     const defaultStartDate =
       start_date ||
@@ -71,37 +72,56 @@ const getProfitLossData = async (req, res) => {
       parseFloat(feeIncome[0]?.total_fees_paid || 0) +
       parseFloat(cashReceipts[0]?.total_cash_receipts || 0);
 
-    // ==================== EXPENDITURE CALCULATIONS ====================
+    // ==================== EXPENDITURE CALCULATIONS (UPDATED - PV ONLY) ====================
 
-    // 1. Expenses (PCV)
-    const [expenses] = await pool.query(
+    // 1. PV Expenses (Paid status only)
+    const [pvExpenses] = await pool.query(
       `SELECT 
-         COALESCE(SUM(e.amount), 0) as total_expenses,
-         COUNT(DISTINCT e.expense_category) as expense_categories
-       FROM expenses e
-       WHERE e.expense_date BETWEEN ? AND ?`,
+         COALESCE(SUM(pv.total_amount), 0) as total_expenses,
+         COUNT(DISTINCT pv.id) as total_pvs,
+         COUNT(DISTINCT pi.expense_category) as expense_categories,
+         COUNT(DISTINCT pv.paid_to) as unique_payees,
+         COALESCE(AVG(pv.total_amount), 0) as average_expense_per_pv
+       FROM pv_headers pv
+       LEFT JOIN pv_items pi ON pv.id = pi.pv_header_id
+       WHERE pv.pv_date BETWEEN ? AND ?
+         AND pv.status = 'Paid'`,
       [defaultStartDate, defaultEndDate],
     );
 
-    // Get expense details separately if needed
+    // Get PV expense details separately if needed
     let expenseDetails = [];
     if (include_details === "true") {
       const [details] = await pool.query(
         `SELECT 
-           e.expense_category,
-           e.amount,
-           e.description,
-           e.paid_to,
-           e.expense_date
-         FROM expenses e
-         WHERE e.expense_date BETWEEN ? AND ?
-         ORDER BY e.expense_date DESC`,
+           pv.pv_number,
+           pv.pv_date as expense_date,
+           pi.expense_category,
+           pi.quantity,
+           pi.unit_price,
+           (pi.quantity * pi.unit_price) as amount,
+           pi.description as item_description,
+           pv.description as pv_description,
+           pv.paid_to,
+           pv.payment_method,
+           pv.reference_number,
+           pv.status,
+           u.username as recorded_by_name,
+           au.username as approved_by_name,
+           DATE_FORMAT(pv.approved_at, '%Y-%m-%d %H:%i') as approved_at
+         FROM pv_headers pv
+         LEFT JOIN pv_items pi ON pv.id = pi.pv_header_id
+         LEFT JOIN users u ON pv.recorded_by = u.id
+         LEFT JOIN users au ON pv.approved_by = au.id
+         WHERE pv.pv_date BETWEEN ? AND ?
+           AND pv.status = 'Paid'
+         ORDER BY pv.pv_date DESC`,
         [defaultStartDate, defaultEndDate],
       );
       expenseDetails = details;
     }
 
-    // 2. Payroll (UPDATED: From payroll_entries table) - FIXED QUERY
+    // 2. Payroll (from payroll_entries table)
     const [payroll] = await pool.query(
       `SELECT 
          COALESCE(SUM(pe.total_gross), 0) as total_payroll_gross,
@@ -121,11 +141,11 @@ const getProfitLossData = async (req, res) => {
          )`,
       [
         defaultStartDate,
-        defaultEndDate, // start_date BETWEEN
+        defaultEndDate,
         defaultStartDate,
-        defaultEndDate, // end_date BETWEEN
+        defaultEndDate,
         defaultStartDate,
-        defaultEndDate, // period overlaps
+        defaultEndDate,
       ],
     );
 
@@ -134,7 +154,6 @@ const getProfitLossData = async (req, res) => {
     let payrollCategoryBreakdown = [];
 
     if (include_details === "true") {
-      // Get payroll details with period information
       const [details] = await pool.query(
         `SELECT 
            pe.staff_id,
@@ -170,10 +189,9 @@ const getProfitLossData = async (req, res) => {
       );
       payrollDetails = details;
 
-      // Get payroll category breakdown
       const [categories] = await pool.query(
         `SELECT 
-           sc.category_name as category,
+           COALESCE(sc.category_name, 'Uncategorized') as category,
            COALESCE(SUM(pe.net_salary), 0) as amount,
            COUNT(DISTINCT pe.staff_id) as staff_count,
            AVG(pe.net_salary) as avg_salary
@@ -188,7 +206,7 @@ const getProfitLossData = async (req, res) => {
              OR (pp.end_date BETWEEN ? AND ?)
              OR (pp.start_date <= ? AND pp.end_date >= ?)
            )
-         GROUP BY sc.category_name
+         GROUP BY category
          ORDER BY amount DESC`,
         [
           defaultStartDate,
@@ -204,69 +222,14 @@ const getProfitLossData = async (req, res) => {
 
     // 3. Total Expenditure Calculation
     const totalExpenditure =
-      parseFloat(expenses[0]?.total_expenses || 0) +
+      parseFloat(pvExpenses[0]?.total_expenses || 0) +
       parseFloat(payroll[0]?.total_payroll_net || 0);
 
     // ==================== PROFIT/LOSS CALCULATION ====================
     const profitLoss = totalIncome - totalExpenditure;
     const profitMargin = totalIncome > 0 ? (profitLoss / totalIncome) * 100 : 0;
 
-    // ==================== TREND ANALYSIS ====================
-
-    // Get monthly trend for the last 6 months
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    const trendStartDate = sixMonthsAgo.toISOString().split("T")[0];
-
-    const [monthlyTrend] = await pool.query(
-      `WITH months AS (
-         SELECT DATE_FORMAT(DATE_ADD(?, INTERVAL seq MONTH), '%Y-%m') as month
-         FROM (SELECT 0 as seq UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5) seq
-       )
-       SELECT 
-         m.month,
-         DATE_FORMAT(STR_TO_DATE(CONCAT(m.month, '-01'), '%Y-%m-%d'), '%M %Y') as month_name,
-         
-         -- Fees income
-         COALESCE((
-           SELECT SUM(stb.paid_amount)
-           FROM student_term_bills stb
-           WHERE DATE_FORMAT(stb.last_payment_date, '%Y-%m') = m.month
-             AND stb.is_finalized = TRUE
-         ), 0) as month_fees,
-         
-         -- Cash receipts
-         COALESCE((
-           SELECT SUM(cr.amount)
-           FROM daily_cash_receipts cr
-           WHERE DATE_FORMAT(cr.receipt_date, '%Y-%m') = m.month
-         ), 0) as month_cash,
-         
-         -- Expenses
-         COALESCE((
-           SELECT SUM(e.amount)
-           FROM expenses e
-           WHERE DATE_FORMAT(e.expense_date, '%Y-%m') = m.month
-         ), 0) as month_expenses,
-         
-         -- Payroll
-         COALESCE((
-           SELECT SUM(pe.net_salary)
-           FROM payroll_entries pe
-           INNER JOIN payroll_periods pp ON pe.period_id = pp.id
-           WHERE DATE_FORMAT(pp.start_date, '%Y-%m') = m.month
-             AND pe.is_approved = TRUE
-             AND pp.is_processed = TRUE
-         ), 0) as month_payroll
-         
-       FROM months m
-       WHERE m.month >= DATE_FORMAT(?, '%Y-%m')
-       GROUP BY m.month, month_name
-       ORDER BY m.month`,
-      [trendStartDate, trendStartDate],
-    );
-
-    // ==================== CATEGORY BREAKDOWN ====================
+    // ==================== CATEGORY BREAKDOWN (UPDATED) ====================
 
     const [incomeBreakdown] = await pool.query(
       `SELECT 
@@ -289,30 +252,25 @@ const getProfitLossData = async (req, res) => {
       [defaultStartDate, defaultEndDate, defaultStartDate, defaultEndDate],
     );
 
+    // Expense breakdown from PVs (by category)
     const [expenseBreakdown] = await pool.query(
       `SELECT 
-         'Payroll' as category,
-         COALESCE(SUM(pe.net_salary), 0) as amount,
-         COUNT(DISTINCT pe.id) as transactions
-       FROM payroll_entries pe
-       WHERE pe.payment_date BETWEEN ? AND ?
-         AND pe.is_approved = TRUE
-       UNION ALL
-       SELECT 
-         e.expense_category as category,
-         COALESCE(SUM(e.amount), 0) as amount,
-         COUNT(DISTINCT e.id) as transactions
-       FROM expenses e
-       WHERE e.expense_date BETWEEN ? AND ?
-       GROUP BY e.expense_category
+         pi.expense_category as category,
+         COALESCE(SUM(pi.quantity * pi.unit_price), 0) as amount,
+         COUNT(DISTINCT pv.id) as transactions
+       FROM pv_headers pv
+       LEFT JOIN pv_items pi ON pv.id = pi.pv_header_id
+       WHERE pv.pv_date BETWEEN ? AND ?
+         AND pv.status = 'Paid'
+       GROUP BY pi.expense_category
        ORDER BY amount DESC`,
-      [defaultStartDate, defaultEndDate, defaultStartDate, defaultEndDate],
+      [defaultStartDate, defaultEndDate],
     );
 
-    // ==================== PAYROLL CATEGORY BREAKDOWN ====================
+    // Payroll category breakdown
     const [payrollCategoryData] = await pool.query(
       `SELECT 
-         COALESCE(sc.category_name, 'Uncategorized', 'Other Staff') as category,
+         COALESCE(sc.category_name, 'Uncategorized') as category,
          COALESCE(SUM(pe.net_salary), 0) as amount,
          COUNT(DISTINCT pe.staff_id) as staff_count,
          AVG(pe.net_salary) as avg_salary
@@ -322,7 +280,7 @@ const getProfitLossData = async (req, res) => {
        WHERE pe.is_approved = TRUE
          AND pe.payment_date BETWEEN ? AND ?
          AND pe.payment_date IS NOT NULL
-       GROUP BY COALESCE(sc.category_name, 'Uncategorized', 'Other Staff')
+       GROUP BY category
        ORDER BY amount DESC`,
       [defaultStartDate, defaultEndDate],
     );
@@ -354,6 +312,63 @@ const getProfitLossData = async (req, res) => {
       totalIncome > 0
         ? (parseFloat(payroll[0]?.total_payroll_net || 0) / totalIncome) * 100
         : 0;
+
+    // ==================== TREND ANALYSIS (UPDATED) ====================
+
+    // Get monthly trend for the last 6 months using PVs
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const trendStartDate = sixMonthsAgo.toISOString().split("T")[0];
+
+    const [monthlyTrend] = await pool.query(
+      `WITH RECURSIVE months AS (
+         SELECT DATE_FORMAT(?, '%Y-%m') as month
+         UNION ALL
+         SELECT DATE_FORMAT(DATE_ADD(STR_TO_DATE(CONCAT(month, '-01'), '%Y-%m-%d'), INTERVAL 1 MONTH), '%Y-%m')
+         FROM months
+         WHERE month < DATE_FORMAT(?, '%Y-%m')
+       )
+       SELECT 
+         m.month,
+         DATE_FORMAT(STR_TO_DATE(CONCAT(m.month, '-01'), '%Y-%m-%d'), '%M %Y') as month_name,
+         
+         -- Fees income
+         COALESCE((
+           SELECT SUM(stb.paid_amount)
+           FROM student_term_bills stb
+           WHERE DATE_FORMAT(stb.last_payment_date, '%Y-%m') = m.month
+             AND stb.is_finalized = TRUE
+         ), 0) as month_fees,
+         
+         -- Cash receipts
+         COALESCE((
+           SELECT SUM(cr.amount)
+           FROM daily_cash_receipts cr
+           WHERE DATE_FORMAT(cr.receipt_date, '%Y-%m') = m.month
+         ), 0) as month_cash,
+         
+         -- PV Expenses (Paid status only)
+         COALESCE((
+           SELECT SUM(pv.total_amount)
+           FROM pv_headers pv
+           WHERE DATE_FORMAT(pv.pv_date, '%Y-%m') = m.month
+             AND pv.status = 'Paid'
+         ), 0) as month_expenses,
+         
+         -- Payroll
+         COALESCE((
+           SELECT SUM(pe.net_salary)
+           FROM payroll_entries pe
+           INNER JOIN payroll_periods pp ON pe.period_id = pp.id
+           WHERE DATE_FORMAT(pp.start_date, '%Y-%m') = m.month
+             AND pe.is_approved = TRUE
+             AND pp.is_processed = TRUE
+         ), 0) as month_payroll
+         
+       FROM months m
+       ORDER BY m.month`,
+      [trendStartDate, defaultEndDate],
+    );
 
     // ==================== RESPONSE DATA ====================
 
@@ -387,9 +402,14 @@ const getProfitLossData = async (req, res) => {
         breakdown: incomeBreakdown,
       },
       expenditure: {
-        expenses: {
-          total: parseFloat(expenses[0]?.total_expenses || 0),
-          categories: expenses[0]?.expense_categories || 0,
+        pv_expenses: {
+          total: parseFloat(pvExpenses[0]?.total_expenses || 0),
+          total_pvs: pvExpenses[0]?.total_pvs || 0,
+          categories: pvExpenses[0]?.expense_categories || 0,
+          unique_payees: pvExpenses[0]?.unique_payees || 0,
+          average_per_pv: parseFloat(
+            pvExpenses[0]?.average_expense_per_pv || 0,
+          ),
           details: expenseDetails,
         },
         payroll: {
@@ -419,15 +439,6 @@ const getProfitLossData = async (req, res) => {
             feeIncome[0]?.fee_paying_students > 0
               ? parseFloat(
                   (profitLoss / feeIncome[0]?.fee_paying_students).toFixed(2),
-                )
-              : 0,
-          payroll_percentage:
-            totalIncome > 0
-              ? parseFloat(
-                  (
-                    ((payroll[0]?.total_payroll_net || 0) / totalIncome) *
-                    100
-                  ).toFixed(2),
                 )
               : 0,
         },
@@ -506,10 +517,10 @@ const exportProfitLossExcel = async (plData, res) => {
     ["TOTAL INCOME", plData.summary.total_income, ""],
     ["", "", ""],
     ["EXPENDITURE", "Amount (Ghc)", ""],
+    ["PV Expenses", plData.expenditure.pv_expenses.total, ""],
     ["Payroll (Net)", plData.expenditure.payroll.net_total, ""],
     ["Payroll (Gross)", plData.expenditure.payroll.gross_total, ""],
     ["Payroll Deductions", plData.expenditure.payroll.deductions_total, ""],
-    ["Operating Expenses", plData.expenditure.expenses.total, ""],
     ["TOTAL EXPENDITURE", plData.summary.total_expenditure, ""],
     ["", "", ""],
     ["PROFIT/LOSS", plData.summary.profit_loss, ""],
@@ -527,21 +538,21 @@ const exportProfitLossExcel = async (plData, res) => {
     item.amount,
     item.transactions,
   ]);
-  incomeData.unshift(["Category", "Amount", "Transactions"]);
+  incomeData.unshift(["Category", "Amount (Ghc)", "Transactions"]);
 
   const ws2 = XLSX.utils.aoa_to_sheet(incomeData);
   XLSX.utils.book_append_sheet(workbook, ws2, "Income Breakdown");
 
-  // Expense Breakdown Sheet
-  const expenseData = plData.expenditure.breakdown.map((item) => [
+  // PV Expense Breakdown Sheet
+  const pvExpenseData = plData.expenditure.breakdown.map((item) => [
     item.category,
     item.amount,
     item.transactions,
   ]);
-  expenseData.unshift(["Category", "Amount", "Transactions"]);
+  pvExpenseData.unshift(["Category", "Amount (Ghc)", "Number of PVs"]);
 
-  const ws3 = XLSX.utils.aoa_to_sheet(expenseData);
-  XLSX.utils.book_append_sheet(workbook, ws3, "Expense Breakdown");
+  const ws3 = XLSX.utils.aoa_to_sheet(pvExpenseData);
+  XLSX.utils.book_append_sheet(workbook, ws3, "PV Expense Breakdown");
 
   // Payroll Breakdown Sheet
   const payrollData = plData.expenditure.payroll_breakdown.map((item) => [
@@ -550,7 +561,12 @@ const exportProfitLossExcel = async (plData, res) => {
     item.staff_count,
     item.avg_salary,
   ]);
-  payrollData.unshift(["Category", "Amount", "Staff Count", "Average Salary"]);
+  payrollData.unshift([
+    "Category",
+    "Amount (Ghc)",
+    "Staff Count",
+    "Average Salary",
+  ]);
 
   const ws4 = XLSX.utils.aoa_to_sheet(payrollData);
   XLSX.utils.book_append_sheet(workbook, ws4, "Payroll by Category");
@@ -570,7 +586,6 @@ const exportProfitLossExcel = async (plData, res) => {
 
 // Helper: Export to CSV
 const exportProfitLossCSV = async (plData, res) => {
-  // Create CSV content
   let csvContent = "Profit & Loss Statement\n";
   csvContent += `Period: ${plData.period.start_date} to ${plData.period.end_date}\n\n`;
 
@@ -582,10 +597,16 @@ const exportProfitLossCSV = async (plData, res) => {
     csvContent += `${item.category},${item.amount},${item.transactions} transactions\n`;
   });
 
-  // Expenses
-  csvContent += "\nEXPENDITURE\n";
+  // PV Expenses
+  csvContent += "\nPV EXPENSES\n";
   plData.expenditure.breakdown.forEach((item) => {
-    csvContent += `${item.category},${item.amount},${item.transactions} transactions\n`;
+    csvContent += `${item.category},${item.amount},${item.transactions} PVs\n`;
+  });
+
+  // Payroll
+  csvContent += "\nPAYROLL\n";
+  plData.expenditure.payroll_breakdown.forEach((item) => {
+    csvContent += `${item.category},${item.amount},${item.staff_count} staff\n`;
   });
 
   // Summary
@@ -603,7 +624,7 @@ const exportProfitLossCSV = async (plData, res) => {
   res.send(csvContent);
 };
 
-// Helper: Export to PDF
+// Helper: Export to PDF (UPDATED with PV expenses)
 const exportProfitLossPDF = async (plData, res) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -649,6 +670,10 @@ const exportProfitLossPDF = async (plData, res) => {
     ["Net Profit/Loss", `Ghc ${plData.summary.profit_loss.toFixed(2)}`],
     ["Profit Margin", `${plData.summary.profit_margin.toFixed(2)}%`],
     [
+      "Expense/Income Ratio",
+      `${plData.summary.expense_income_ratio.toFixed(2)}%`,
+    ],
+    [
       "Payroll/Income Ratio",
       `${plData.summary.payroll_income_ratio.toFixed(2)}%`,
     ],
@@ -664,32 +689,6 @@ const exportProfitLossPDF = async (plData, res) => {
   });
 
   yPos += summaryData.length * 7 + 15;
-
-  // Payroll Breakdown Section
-  if (plData.expenditure.payroll_breakdown.length > 0) {
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("PAYROLL BREAKDOWN BY CATEGORY", 20, yPos);
-    yPos += 10;
-
-    const payrollTable = plData.expenditure.payroll_breakdown.map((item) => [
-      item.category,
-      `Ghc ${parseFloat(item.amount).toFixed(2)}`,
-      item.staff_count,
-      `Ghc ${parseFloat(item.avg_salary || 0).toFixed(2)}`,
-    ]);
-
-    autoTable(doc, {
-      startY: yPos,
-      head: [["Category", "Amount", "Staff Count", "Avg Salary"]],
-      body: payrollTable,
-      headStyles: { fillColor: [245, 158, 11], textColor: [255, 255, 255] }, // Amber color
-      styles: { fontSize: 9 },
-      margin: { left: 20, right: 20 },
-    });
-
-    yPos = doc.lastAutoTable.finalY + 10;
-  }
 
   // Income Breakdown
   doc.setFontSize(12);
@@ -712,15 +711,15 @@ const exportProfitLossPDF = async (plData, res) => {
     margin: { left: 20, right: 20 },
   });
 
-  yPos = doc.lastAutoTable.finalY + 10;
+  yPos = doc.lastAutoTable.finalY + 15;
 
-  // Expense Breakdown
+  // PV Expense Breakdown
   doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
-  doc.text("EXPENDITURE BREAKDOWN", 20, yPos);
+  doc.text("PV EXPENSE BREAKDOWN", 20, yPos);
   yPos += 10;
 
-  const expenseTable = plData.expenditure.breakdown.map((item) => [
+  const pvExpenseTable = plData.expenditure.breakdown.map((item) => [
     item.category,
     `Ghc ${parseFloat(item.amount).toFixed(2)}`,
     item.transactions,
@@ -728,12 +727,38 @@ const exportProfitLossPDF = async (plData, res) => {
 
   autoTable(doc, {
     startY: yPos,
-    head: [["Category", "Amount", "Transactions"]],
-    body: expenseTable,
+    head: [["Category", "Amount", "Number of PVs"]],
+    body: pvExpenseTable,
     headStyles: { fillColor: [220, 53, 69], textColor: [255, 255, 255] },
     styles: { fontSize: 9 },
     margin: { left: 20, right: 20 },
   });
+
+  yPos = doc.lastAutoTable.finalY + 15;
+
+  // Payroll Breakdown
+  if (plData.expenditure.payroll_breakdown.length > 0) {
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("PAYROLL BREAKDOWN BY CATEGORY", 20, yPos);
+    yPos += 10;
+
+    const payrollTable = plData.expenditure.payroll_breakdown.map((item) => [
+      item.category,
+      `Ghc ${parseFloat(item.amount).toFixed(2)}`,
+      item.staff_count,
+      `Ghc ${parseFloat(item.avg_salary || 0).toFixed(2)}`,
+    ]);
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Category", "Amount", "Staff Count", "Avg Salary"]],
+      body: payrollTable,
+      headStyles: { fillColor: [245, 158, 11], textColor: [255, 255, 255] },
+      styles: { fontSize: 9 },
+      margin: { left: 20, right: 20 },
+    });
+  }
 
   // Footer
   const finalY = doc.internal.pageSize.height - 20;
@@ -759,7 +784,7 @@ const exportProfitLossPDF = async (plData, res) => {
   res.send(pdfBuffer);
 };
 
-// GET /api/finance/profit-loss/trends - Get profit/loss trends
+// GET /api/finance/profit-loss/trends - Get profit/loss trends (UPDATED)
 const getProfitLossTrends = async (req, res) => {
   try {
     const { timeframe = "6months" } = req.query;
@@ -772,23 +797,22 @@ const getProfitLossTrends = async (req, res) => {
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - months);
     const formattedStartDate = startDate.toISOString().split("T")[0];
+    const currentDate = new Date().toISOString().split("T")[0];
 
-    // Dynamic months generation
-    let monthSequence = "";
-    for (let i = 0; i < months; i++) {
-      monthSequence += i === 0 ? i.toString() : ` UNION SELECT ${i}`;
-    }
-
+    // Generate month sequence using recursive CTE
     const [trends] = await pool.query(
-      `WITH months AS (
-         SELECT DATE_FORMAT(DATE_ADD(?, INTERVAL seq MONTH), '%Y-%m') as month
-         FROM (SELECT 0 as seq UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5) seq
+      `WITH RECURSIVE months AS (
+         SELECT DATE_FORMAT(?, '%Y-%m') as month
+         UNION ALL
+         SELECT DATE_FORMAT(DATE_ADD(STR_TO_DATE(CONCAT(month, '-01'), '%Y-%m-%d'), INTERVAL 1 MONTH), '%Y-%m')
+         FROM months
+         WHERE month < DATE_FORMAT(?, '%Y-%m')
        )
        SELECT 
          m.month,
          DATE_FORMAT(STR_TO_DATE(CONCAT(m.month, '-01'), '%Y-%m-%d'), '%b %Y') as label,
          
-         -- Income from fees (properly aggregated)
+         -- Income from fees
          COALESCE((
            SELECT SUM(stb.paid_amount) 
            FROM student_term_bills stb
@@ -804,12 +828,13 @@ const getProfitLossTrends = async (req, res) => {
            WHERE DATE_FORMAT(cr.receipt_date, '%Y-%m') = m.month
          ), 0) as income_other,
          
-         -- Operating expenses
+         -- PV Expenses (Paid status only)
          COALESCE((
-           SELECT SUM(e.amount)
-           FROM expenses e
-           WHERE DATE_FORMAT(e.expense_date, '%Y-%m') = m.month
-         ), 0) as expenses_operating,
+           SELECT SUM(pv.total_amount)
+           FROM pv_headers pv
+           WHERE DATE_FORMAT(pv.pv_date, '%Y-%m') = m.month
+             AND pv.status = 'Paid'
+         ), 0) as expenses_pv,
          
          -- Payroll expenses
          COALESCE((
@@ -822,25 +847,29 @@ const getProfitLossTrends = async (req, res) => {
          ), 0) as expenses_payroll
          
        FROM months m
-       WHERE m.month >= DATE_FORMAT(?, '%Y-%m')
        ORDER BY m.month`,
-      [formattedStartDate, formattedStartDate],
+      [formattedStartDate, currentDate],
     );
 
-    // Then calculate derived columns
+    // Calculate derived columns
     const calculatedTrends = trends.map((trend) => {
       const income_fees = parseFloat(trend.income_fees) || 0;
       const income_other = parseFloat(trend.income_other) || 0;
-      const expenses_operating = parseFloat(trend.expenses_operating) || 0;
+      const expenses_pv = parseFloat(trend.expenses_pv) || 0;
       const expenses_payroll = parseFloat(trend.expenses_payroll) || 0;
 
       const total_income = income_fees + income_other;
-      const total_expenses = expenses_operating + expenses_payroll;
+      const total_expenses = expenses_pv + expenses_payroll;
       const profit_loss = total_income - total_expenses;
 
       return {
-        ...trend,
+        month: trend.month,
+        label: trend.label,
+        income_fees,
+        income_other,
         total_income,
+        expenses_pv,
+        expenses_payroll,
         total_expenses,
         profit_loss,
       };
@@ -853,41 +882,37 @@ const getProfitLossTrends = async (req, res) => {
       trends: calculatedTrends,
       summary: {
         avg_monthly_income:
-          trends.length > 0
+          calculatedTrends.length > 0
             ? parseFloat(
                 (
-                  trends.reduce(
-                    (sum, t) => sum + parseFloat(t.total_income),
-                    0,
-                  ) / trends.length
+                  calculatedTrends.reduce((sum, t) => sum + t.total_income, 0) /
+                  calculatedTrends.length
                 ).toFixed(2),
               )
             : 0,
         avg_monthly_expenses:
-          trends.length > 0
+          calculatedTrends.length > 0
             ? parseFloat(
                 (
-                  trends.reduce(
-                    (sum, t) => sum + parseFloat(t.total_expenses),
+                  calculatedTrends.reduce(
+                    (sum, t) => sum + t.total_expenses,
                     0,
-                  ) / trends.length
+                  ) / calculatedTrends.length
                 ).toFixed(2),
               )
             : 0,
         avg_monthly_profit:
-          trends.length > 0
+          calculatedTrends.length > 0
             ? parseFloat(
                 (
-                  trends.reduce(
-                    (sum, t) => sum + parseFloat(t.profit_loss),
-                    0,
-                  ) / trends.length
+                  calculatedTrends.reduce((sum, t) => sum + t.profit_loss, 0) /
+                  calculatedTrends.length
                 ).toFixed(2),
               )
             : 0,
-        profitable_months: trends.filter((t) => parseFloat(t.profit_loss) > 0)
+        profitable_months: calculatedTrends.filter((t) => t.profit_loss > 0)
           .length,
-        total_months: trends.length,
+        total_months: calculatedTrends.length,
       },
     });
   } catch (error) {

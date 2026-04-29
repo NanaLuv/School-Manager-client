@@ -140,6 +140,7 @@ const {
   getEmailStats,
   getEmailLogs,
   sendBulkBalanceReminders,
+  exportPVHeaders
 } = require("../controller/control");
 
 const router = express.Router();
@@ -194,6 +195,17 @@ const {
   failedLoginLimiter,
   getRateLimitStatus,
 } = require("../middleware/rateLimiter");
+const {
+  getPVHeaders,
+  getPVStatistics,
+  getPVHeaderById,
+  createPVHeader,
+  updatePVHeader,
+  deletePVHeader,
+  approvePV,
+  markPVAsPaid,
+  // exportPVHeaders,
+} = require("../controller/pvController");
 
 router.post("/login", loginLimiter, failedLoginLimiter, loginUser);
 router.get("/login-status", getRateLimitStatus);
@@ -463,6 +475,21 @@ router.post("/expenses", authorizeRoles(1, 4), createExpense);
 router.get("/expenses/:id", getExpenseById);
 router.put("/expenses/:id", authorizeRoles(1, 4), updateExpense);
 router.delete("/expenses/:id", authorizeRoles(1, 4), deleteExpense);
+
+// new expense routes
+router.get("/pv-headers", getPVHeaders);
+router.get("/pv-headers/statistics", getPVStatistics);
+router.get("/pv-headers/export", exportPVHeaders);
+
+// Single PV operations
+router.get("/pv-headers/:id", getPVHeaderById);
+router.post("/pv-headers", createPVHeader);
+router.put("/pv-headers/:id", updatePVHeader);
+router.delete("/pv-headers/:id", deletePVHeader);
+
+// Status transition endpoints
+router.put("/pv-headers/:id/approve", approvePV);
+router.put("/pv-headers/:id/mark-paid", markPVAsPaid);
 
 // School Settings Routes
 router.get("/school-settings", getSchoolSettings);

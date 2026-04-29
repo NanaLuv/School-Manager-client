@@ -12964,164 +12964,686 @@ const exportExpensesExcel = async (res, expenses, summary) => {
 };
 
 // Helper: Export expenses to PDF
-const exportExpensesPDF = async (res, expenses, summary) => {
+// const exportExpensesPDF = async (res, expenses, summary) => {
+//   try {
+//     const doc = new jsPDF();
+//     const pageWidth = doc.internal.pageSize.getWidth();
+//     const pageHeight = doc.internal.pageSize.getHeight();
+//     const schoolSettings = await getSchoolSettingsForPDF();
+//     const primaryColor = [41, 128, 185];
+
+//     // Header with logo on left
+//     const headerHeight = 30;
+//     doc.setFillColor(41, 128, 185);
+//     doc.rect(0, 0, pageWidth, headerHeight, "F");
+
+//     // Logo on left (if exists)
+//     const hasLogo = await addSchoolLogoToPDF(doc, 15, 5, 20, 20);
+
+//     doc.setTextColor(255, 255, 255);
+//     doc.setFontSize(20);
+//     doc.setFont("helvetica", "bold");
+//     doc.text(schoolSettings.school_name, hasLogo ? 50 : pageWidth / 2, 12, {
+//       align: hasLogo ? "left" : "center",
+//     });
+
+//     doc.setFontSize(16);
+//     doc.text("EXPENSES / PV REPORT", pageWidth / 2, 22, { align: "center" });
+
+//     // Format date helper
+//     const formatDate = (dateStr) => {
+//       if (!dateStr) return "N/A";
+//       try {
+//         const date = new Date(dateStr);
+//         return date.toLocaleDateString("en-US", {
+//           year: "numeric",
+//           month: "short",
+//           day: "numeric",
+//         });
+//       } catch (error) {
+//         return dateStr;
+//       }
+//     };
+
+//     // Report period
+//     doc.setFontSize(10);
+//     doc.setTextColor(0, 0, 0);
+//     doc.setFont("helvetica", "normal");
+
+//     doc.text(
+//       `Period: ${formatDate(summary["Start Date"])} to ${formatDate(
+//         summary["End Date"],
+//       )}`,
+//       20,
+//       40,
+//     );
+//     doc.text(
+//       `Generated: ${new Date().toLocaleDateString()}`,
+//       pageWidth - 20,
+//       40,
+//       {
+//         align: "right",
+//       },
+//     );
+
+//     // Summary section
+//     let yPos = 50;
+//     doc.setFontSize(12);
+//     doc.setFont("helvetica", "bold");
+//     doc.text("SUMMARY", 20, yPos);
+//     yPos += 8;
+
+//     doc.setFontSize(10);
+//     doc.setFont("helvetica", "normal");
+//     const summaryLines = [
+//       `Total Expenses: ${summary["Total Expenses"] || 0}`,
+//       `Total Amount: Ghc ${parseFloat(summary["Total Amount"] || 0).toFixed(
+//         2,
+//       )}`,
+//       `Average Amount: Ghc ${parseFloat(summary["Average Amount"] || 0).toFixed(
+//         2,
+//       )}`,
+//     ];
+
+//     summaryLines.forEach((line, index) => {
+//       doc.text(line, 20, yPos + index * 5);
+//     });
+
+//     yPos += summaryLines.length * 5 + 10;
+
+//     // Table data
+//     const tableData = expenses.map((expense) => [
+//       expense["Voucher Number"] || "",
+//       formatDate(expense["Date"]),
+//       expense["Category"] || "",
+//       expense["Description"]?.substring(0, 30) +
+//         (expense["Description"]?.length > 30 ? "..." : "") || "",
+//       expense["Paid To"]?.substring(0, 20) +
+//         (expense["Paid To"]?.length > 20 ? "..." : "") || "",
+//       `Ghc ${parseFloat(expense["Amount"] || 0).toFixed(2)}`,
+//       expense["Payment Method"] || "",
+//     ]);
+
+//     // Generate table
+//     autoTable(doc, {
+//       startY: yPos,
+//       head: [
+//         [
+//           "Voucher No",
+//           "Date",
+//           "Category",
+//           "Description",
+//           "Paid To",
+//           "Amount",
+//           "Method",
+//         ],
+//       ],
+//       body: tableData,
+//       headStyles: {
+//         fillColor: primaryColor,
+//         textColor: [255, 255, 255],
+//         fontStyle: "bold",
+//         fontSize: 9,
+//       },
+//       bodyStyles: {
+//         fontSize: 8,
+//         cellPadding: 2,
+//       },
+//       alternateRowStyles: {
+//         fillColor: [248, 248, 248],
+//       },
+//       styles: {
+//         overflow: "linebreak",
+//         cellWidth: "wrap",
+//       },
+//       margin: { left: 10, right: 10 },
+//       didDrawPage: (data) => {
+//         const pageCount = doc.internal.getNumberOfPages();
+//         doc.setFontSize(8);
+//         doc.setTextColor(100, 100, 100);
+//         doc.text(
+//           `Page ${data.pageNumber} of ${pageCount}`,
+//           pageWidth / 2,
+//           pageHeight - 10,
+//           { align: "center" },
+//         );
+//       },
+//     });
+
+//     res.setHeader("Content-Type", "application/pdf");
+//     res.setHeader(
+//       "Content-Disposition",
+//       `attachment; filename="expenses-${
+//         new Date().toISOString().split("T")[0]
+//       }.pdf"`,
+//     );
+//     res.send(Buffer.from(doc.output("arraybuffer")));
+//   } catch (error) {
+//     console.error("Error creating PDF:", error);
+//     throw error;
+//   }
+// };
+
+// ==================== PV EXPORT FUNCTIONS ====================
+
+// GET /api/pv-headers/export - Export PV headers to Excel or PDF
+const exportPVHeaders = async (req, res) => {
   try {
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const schoolSettings = await getSchoolSettingsForPDF();
-    const primaryColor = [41, 128, 185];
+    const {
+      start_date,
+      end_date,
+      status,
+      paid_to,
+      format = "excel",
+    } = req.query;
 
-    // Header with logo on left
-    const headerHeight = 30;
-    doc.setFillColor(41, 128, 185);
-    doc.rect(0, 0, pageWidth, headerHeight, "F");
+    let whereConditions = ["1=1"];
+    let queryParams = [];
 
-    // Logo on left (if exists)
-    const hasLogo = await addSchoolLogoToPDF(doc, 15, 5, 20, 20);
+    // Set default dates if not provided (last 30 days)
+    const defaultStartDate =
+      start_date ||
+      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0];
+    const defaultEndDate = end_date || new Date().toISOString().split("T")[0];
 
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
+    whereConditions.push("pv.pv_date BETWEEN ? AND ?");
+    queryParams.push(defaultStartDate, defaultEndDate);
+
+    if (status && status !== "") {
+      whereConditions.push("pv.status = ?");
+      queryParams.push(status);
+    }
+
+    if (paid_to && paid_to !== "") {
+      whereConditions.push("pv.paid_to LIKE ?");
+      queryParams.push(`%${paid_to}%`);
+    }
+
+    // Get PV headers with their items
+    const [pvHeaders] = await pool.query(
+      `SELECT 
+         pv.*,
+         u.username as recorded_by_name,
+         au.username as approved_by_name,
+         (SELECT COUNT(*) FROM pv_items WHERE pv_header_id = pv.id) as item_count
+       FROM pv_headers pv
+       LEFT JOIN users u ON pv.recorded_by = u.id
+       LEFT JOIN users au ON pv.approved_by = au.id
+       WHERE ${whereConditions.join(" AND ")}
+       ORDER BY pv.pv_date DESC, pv.id DESC`,
+      queryParams,
+    );
+
+    // Get items for each PV
+    const pvWithItems = await Promise.all(
+      pvHeaders.map(async (pv) => {
+        const [items] = await pool.query(
+          "SELECT * FROM pv_items WHERE pv_header_id = ? ORDER BY id",
+          [pv.id],
+        );
+        return { ...pv, items };
+      }),
+    );
+
+    // Get summary statistics
+    const [summary] = await pool.query(
+      `SELECT 
+         COUNT(*) as total_pvs,
+         SUM(CASE WHEN status = 'Draft' THEN 1 ELSE 0 END) as draft_count,
+         SUM(CASE WHEN status = 'Approved' THEN 1 ELSE 0 END) as approved_count,
+         SUM(CASE WHEN status = 'Paid' THEN 1 ELSE 0 END) as paid_count,
+         SUM(total_amount) as total_amount,
+         AVG(total_amount) as average_amount,
+         MIN(pv_date) as start_date,
+         MAX(pv_date) as end_date
+       FROM pv_headers pv
+       WHERE ${whereConditions.join(" AND ")}`,
+      queryParams,
+    );
+
+    if (format === "pdf") {
+      await exportPVHeadersToPDF(res, pvWithItems, summary[0] || {}, {
+        start_date: defaultStartDate,
+        end_date: defaultEndDate,
+        status,
+        paid_to,
+      });
+    } else {
+      await exportPVHeadersToExcel(res, pvWithItems, summary[0] || {});
+    }
+  } catch (error) {
+    console.error("Error exporting PV headers:", error);
+    res.status(500).json({ error: "Failed to export PVs: " + error.message });
+  }
+};
+
+// Helper: Export to Excel
+const exportPVHeadersToExcel = async (res, pvData, summary) => {
+  const XLSX = require("xlsx");
+  const workbook = XLSX.utils.book_new();
+
+  // Sheet 1: PV Summary List
+  const summaryData = pvData.map((pv) => ({
+    "PV Number": pv.pv_number,
+    Date: new Date(pv.pv_date).toLocaleDateString(),
+    Payee: pv.paid_to || "",
+    Description: pv.description || "",
+    "Total Amount": pv.total_amount,
+    Status: pv.status,
+    "Items Count": pv.item_count,
+    "Payment Method": pv.payment_method || "Cash",
+    Reference: pv.reference_number || "",
+    "Recorded By": pv.recorded_by_name || "",
+    "Approved By": pv.approved_by_name || "",
+    "Approved At": pv.approved_at
+      ? new Date(pv.approved_at).toLocaleString()
+      : "",
+  }));
+
+  const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+  XLSX.utils.book_append_sheet(workbook, summarySheet, "PV Summary");
+
+  // Sheet 2: Detailed Items (one row per item, for pivot analysis)
+  const itemsData = [];
+  pvData.forEach((pv) => {
+    pv.items.forEach((item) => {
+      itemsData.push({
+        "PV Number": pv.pv_number,
+        "PV Date": new Date(pv.pv_date).toLocaleDateString(),
+        Payee: pv.paid_to || "",
+        Status: pv.status,
+        Category: item.expense_category,
+        Quantity: item.quantity,
+        "Unit Price": item.unit_price,
+        Amount: item.amount || item.quantity * item.unit_price,
+        "Item Description": item.description || "",
+        "PV Description": pv.description || "",
+      });
+    });
+  });
+
+  const itemsSheet = XLSX.utils.json_to_sheet(itemsData);
+  XLSX.utils.book_append_sheet(workbook, itemsSheet, "Item Details");
+
+  // Sheet 3: Statistics
+  const statsData = [
+    {
+      Metric: "Period Start",
+      Value: summary.start_date
+        ? new Date(summary.start_date).toLocaleDateString()
+        : "N/A",
+    },
+    {
+      Metric: "Period End",
+      Value: summary.end_date
+        ? new Date(summary.end_date).toLocaleDateString()
+        : "N/A",
+    },
+    { Metric: "Total PVs", Value: summary.total_pvs || 0 },
+    { Metric: "Draft PVs", Value: summary.draft_count || 0 },
+    { Metric: "Approved PVs", Value: summary.approved_count || 0 },
+    { Metric: "Paid PVs", Value: summary.paid_count || 0 },
+    {
+      Metric: "Total Amount",
+      Value: `Ghc ${summary.total_amount}`,
+    },
+    {
+      Metric: "Average Amount",
+      Value: `Ghc ${summary.average_amount}`,
+    },
+    { Metric: "Export Date", Value: new Date().toLocaleString() },
+  ];
+
+  const statsSheet = XLSX.utils.json_to_sheet(statsData);
+  XLSX.utils.book_append_sheet(workbook, statsSheet, "Statistics");
+
+  // Auto-size columns helper
+  const autoSizeColumns = (worksheet, data) => {
+    const cols = [];
+    if (data.length > 0) {
+      Object.keys(data[0]).forEach((key, idx) => {
+        let maxLen = key.length;
+        data.forEach((row) => {
+          const val = row[key]?.toString() || "";
+          maxLen = Math.max(maxLen, val.length);
+        });
+        cols[idx] = { wch: Math.min(maxLen + 2, 30) };
+      });
+      worksheet["!cols"] = cols;
+    }
+  };
+
+  autoSizeColumns(summarySheet, summaryData);
+  autoSizeColumns(itemsSheet, itemsData);
+
+  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="pvs-export-${new Date().toISOString().split("T")[0]}.xlsx"`,
+  );
+  res.send(buffer);
+};
+
+// Helper: Export to PDF with signature sections
+const exportPVHeadersToPDF = async (res, pvData, summary, filters) => {
+  const { jsPDF } = require("jspdf");
+  const { autoTable } = require("jspdf-autotable");
+
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  const schoolSettings = await getSchoolSettingsForPDF();
+  const primaryColor = [41, 128, 185];
+
+  // Helper function to format date
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "N/A";
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch (error) {
+      return dateStr;
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return `Ghc ${parseFloat(amount || 0).toFixed(2)}`;
+  };
+
+  for (let idx = 0; idx < pvData.length; idx++) {
+    const pv = pvData[idx];
+
+    if (idx > 0) {
+      doc.addPage();
+    }
+
+    let yPosition = 25;
+
+    // ========== HEADER SECTION ==========
+    const hasLogo = await addSchoolLogoToPDF(doc, 15, 10, 20, 20);
+    const schoolNameX = hasLogo ? 90 : 15;
+
+    doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text(schoolSettings.school_name, hasLogo ? 50 : pageWidth / 2, 12, {
+    doc.setTextColor(...primaryColor);
+    doc.text(schoolSettings.school_name, hasLogo ? 65 : pageWidth / 2, 12, {
       align: hasLogo ? "left" : "center",
     });
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    if (schoolSettings.motto) {
+      doc.text(schoolSettings.motto, schoolNameX, 24);
+    }
 
+    // Title
     doc.setFontSize(16);
-    doc.text("EXPENSES / PV REPORT", pageWidth / 2, 22, { align: "center" });
-
-    // Format date helper
-    const formatDate = (dateStr) => {
-      if (!dateStr) return "N/A";
-      try {
-        const date = new Date(dateStr);
-        return date.toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        });
-      } catch (error) {
-        return dateStr;
-      }
-    };
-
-    // Report period
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "normal");
-
-    doc.text(
-      `Period: ${formatDate(summary["Start Date"])} to ${formatDate(
-        summary["End Date"],
-      )}`,
-      20,
-      40,
-    );
-    doc.text(
-      `Generated: ${new Date().toLocaleDateString()}`,
-      pageWidth - 20,
-      40,
-      {
-        align: "right",
-      },
-    );
-
-    // Summary section
-    let yPos = 50;
-    doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text("SUMMARY", 20, yPos);
-    yPos += 8;
+    doc.setTextColor(...primaryColor);
+    doc.text("PAYMENT VOUCHER (PV)", pageWidth / 2, 32, { align: "center" });
 
+    // PV Number and Date in header
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    const summaryLines = [
-      `Total Expenses: ${summary["Total Expenses"] || 0}`,
-      `Total Amount: Ghc ${parseFloat(summary["Total Amount"] || 0).toFixed(
-        2,
-      )}`,
-      `Average Amount: Ghc ${parseFloat(summary["Average Amount"] || 0).toFixed(
-        2,
-      )}`,
+    doc.setTextColor(0, 0, 0);
+    doc.text(`PV No: ${pv.pv_number}`, pageWidth - 45, 32);
+    doc.text(`Date: ${formatDate(pv.pv_date)}`, pageWidth - 45, 38);
+
+    yPosition = 45;
+
+    // ========== STATUS BADGE ==========
+    const statusColors = {
+      Draft: [255, 193, 7],
+      Approved: [40, 167, 69],
+      Paid: [0, 123, 255],
+      Rejected: [220, 53, 69],
+    };
+    const statusColor = statusColors[pv.status] || [108, 117, 125];
+
+    doc.setFillColor(...statusColor);
+    doc.roundedRect(pageWidth - 25, yPosition - 5, 20, 8, 2, 2, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.text(pv.status, pageWidth - 15, yPosition - 1, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+
+    yPosition += 10;
+
+    // ========== DIVIDER ==========
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(15, yPosition, pageWidth - 15, yPosition);
+    yPosition += 8;
+
+    // ========== PAYMENT DETAILS SECTION ==========
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
+    doc.text("PAYMENT DETAILS", 15, yPosition);
+    yPosition += 8;
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+
+    const paymentDetails = [
+      { label: "Payee (Paid To):", value: pv.paid_to || "N/A" },
+      { label: "Payment Method:", value: pv.payment_method || "Cash" },
+      { label: "Reference Number:", value: pv.reference_number || "N/A" },
+      { label: "Description:", value: pv.description || "N/A" },
     ];
 
-    summaryLines.forEach((line, index) => {
-      doc.text(line, 20, yPos + index * 5);
+    paymentDetails.forEach((detail) => {
+      doc.setFont("helvetica", "bold");
+      doc.text(detail.label, 15, yPosition);
+      doc.setFont("helvetica", "normal");
+      doc.text(detail.value, 55, yPosition);
+      yPosition += 6;
     });
 
-    yPos += summaryLines.length * 5 + 10;
+    yPosition += 5;
 
-    // Table data
-    const tableData = expenses.map((expense) => [
-      expense["Voucher Number"] || "",
-      formatDate(expense["Date"]),
-      expense["Category"] || "",
-      expense["Description"]?.substring(0, 30) +
-        (expense["Description"]?.length > 30 ? "..." : "") || "",
-      expense["Paid To"]?.substring(0, 20) +
-        (expense["Paid To"]?.length > 20 ? "..." : "") || "",
-      `Ghc ${parseFloat(expense["Amount"] || 0).toFixed(2)}`,
-      expense["Payment Method"] || "",
-    ]);
+    // ========== EXPENSE ITEMS TABLE ==========
+    if (pv.items && pv.items.length > 0) {
+      const tableData = pv.items.map((item) => [
+        item.expense_category,
+        item.quantity.toString(),
+        formatCurrency(item.unit_price),
+        formatCurrency(item.amount || item.quantity * item.unit_price),
+        item.description?.substring(0, 40) || "-",
+      ]);
 
-    // Generate table
-    autoTable(doc, {
-      startY: yPos,
-      head: [
-        [
-          "Voucher No",
-          "Date",
-          "Category",
-          "Description",
-          "Paid To",
-          "Amount",
-          "Method",
-        ],
-      ],
-      body: tableData,
-      headStyles: {
-        fillColor: primaryColor,
-        textColor: [255, 255, 255],
-        fontStyle: "bold",
-        fontSize: 9,
-      },
-      bodyStyles: {
-        fontSize: 8,
-        cellPadding: 2,
-      },
-      alternateRowStyles: {
-        fillColor: [248, 248, 248],
-      },
-      styles: {
-        overflow: "linebreak",
-        cellWidth: "wrap",
-      },
-      margin: { left: 10, right: 10 },
-      didDrawPage: (data) => {
-        const pageCount = doc.internal.getNumberOfPages();
-        doc.setFontSize(8);
-        doc.setTextColor(100, 100, 100);
-        doc.text(
-          `Page ${data.pageNumber} of ${pageCount}`,
-          pageWidth / 2,
-          pageHeight - 10,
-          { align: "center" },
-        );
-      },
+      autoTable(doc, {
+        startY: yPosition,
+        head: [["Category", "Qty", "Unit Price", "Amount", "Description"]],
+        body: tableData,
+        headStyles: {
+          fillColor: primaryColor,
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+          fontSize: 9,
+        },
+        bodyStyles: { fontSize: 8, cellPadding: 2 },
+        alternateRowStyles: { fillColor: [248, 248, 248] },
+        columnStyles: {
+          0: { cellWidth: 30 },
+          1: { cellWidth: 15, halign: "center" },
+          2: { cellWidth: 25, halign: "right" },
+          3: { cellWidth: 25, halign: "right" },
+          4: { cellWidth: "auto" },
+        },
+        margin: { left: 15, right: 15 },
+      });
+
+      yPosition = doc.lastAutoTable.finalY + 5;
+    }
+
+    // ========== TOTAL AMOUNT BOX ==========
+    doc.setFillColor(...primaryColor);
+    doc.rect(15, yPosition, pageWidth - 30, 10, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("TOTAL AMOUNT:", 20, yPosition + 6.5);
+    doc.text(formatCurrency(pv.total_amount), pageWidth - 20, yPosition + 6.5, {
+      align: "right",
     });
+    doc.setTextColor(0, 0, 0);
+    yPosition += 15;
 
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="expenses-${
-        new Date().toISOString().split("T")[0]
-      }.pdf"`,
+    // ========== APPROVAL INFO ==========
+    if (pv.approved_by_name) {
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.text("APPROVAL INFORMATION", 15, yPosition);
+      yPosition += 6;
+      doc.setFont("helvetica", "normal");
+      doc.text(`Approved By: ${pv.approved_by_name}`, 15, yPosition);
+      doc.text(
+        `Approved At: ${pv.approved_at ? new Date(pv.approved_at).toLocaleString() : "N/A"}`,
+        100,
+        yPosition,
+      );
+      yPosition += 10;
+    } else if (pv.status === "Draft") {
+      doc.setFontSize(9);
+      doc.setTextColor(150, 150, 150);
+      doc.setFont("helvetica", "italic");
+      doc.text(
+        "This PV is still in DRAFT status and has not been approved.",
+        15,
+        yPosition,
+      );
+      doc.setTextColor(0, 0, 0);
+      yPosition += 10;
+    }
+
+    // ========== SIGNATURE SECTION (Beautiful layout) ==========
+    // if (pv.status === "Approved" || pv.status === "Paid") {
+    //   yPosition += 10;
+
+    //   // Signature box with border
+    //   doc.setDrawColor(180, 180, 180);
+    //   doc.setLineWidth(0.5);
+    //   doc.rect(15, yPosition, pageWidth - 30, 50);
+
+    //   doc.setFontSize(10);
+    //   doc.setFont("helvetica", "bold");
+    //   doc.setTextColor(...primaryColor);
+    //   doc.text("ACKNOWLEDGEMENT & SIGNATURES", pageWidth / 2, yPosition + 8, {
+    //     align: "center",
+    //   });
+
+    //   doc.setDrawColor(200, 200, 200);
+    //   doc.setLineWidth(0.2);
+
+    //   // Line 1 - Prepared By (Finance/Accounts)
+    //   doc.line(15, yPosition + 18, pageWidth - 15, yPosition + 18);
+    //   doc.line(15, yPosition + 20, pageWidth - 15, yPosition + 20);
+    //   doc.setFontSize(8);
+    //   doc.setFont("helvetica", "normal");
+    //   doc.setTextColor(100, 100, 100);
+    //   doc.text("Prepared By (Finance/Accounts)", 25, yPosition + 18.5);
+    //   doc.text("Date", pageWidth - 35, yPosition + 18.5);
+
+    //   // Line 2 - Approved By (Principal/Director)
+    //   if (pv.status === "Approved" || pv.status === "Paid") {
+    //     doc.line(15, yPosition + 32, pageWidth - 15, yPosition + 32);
+    //     doc.line(15, yPosition + 34, pageWidth - 15, yPosition + 34);
+    //     doc.text("Approved By (Principal/Director)", 25, yPosition + 32.5);
+    //     doc.text("Date", pageWidth - 35, yPosition + 32.5);
+
+    //     // Line 3 - Received By (Vendor/Payee) - Only for Paid status
+    //     if (pv.status === "Paid") {
+    //       doc.line(15, yPosition + 46, pageWidth - 15, yPosition + 46);
+    //       doc.line(15, yPosition + 48, pageWidth - 15, yPosition + 48);
+    //       doc.text(
+    //         "Received By (Payee/Vendor Signature)",
+    //         25,
+    //         yPosition + 46.5,
+    //       );
+    //       doc.text("Date", pageWidth - 35, yPosition + 46.5);
+    //     }
+    //   }
+
+    //   yPosition += 60;
+    // } else {
+    //   // For draft PVs, show placeholder signatures
+    //   yPosition += 10;
+    //   doc.setDrawColor(200, 200, 200);
+    //   doc.setLineWidth(0.3);
+    //   doc.rect(15, yPosition, pageWidth - 30, 45);
+
+    //   doc.setFontSize(9);
+    //   doc.setFont("helvetica", "italic");
+    //   doc.setTextColor(150, 150, 150);
+    //   doc.text(
+    //     "Signatures will be available after approval",
+    //     pageWidth / 2,
+    //     yPosition + 22,
+    //     {
+    //       align: "center",
+    //     },
+    //   );
+
+    //   yPosition += 55;
+    // }
+
+    // ========== FOOTER ==========
+    const footerY = pageHeight - 15;
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(15, footerY - 8, pageWidth - 15, footerY - 8);
+
+    doc.setFontSize(7);
+    doc.setTextColor(100, 100, 100);
+    doc.text(
+      `Generated on ${new Date().toLocaleDateString()} | ${schoolSettings.school_name}`,
+      pageWidth / 2,
+      footerY - 3,
+      { align: "center" },
     );
-    res.send(Buffer.from(doc.output("arraybuffer")));
-  } catch (error) {
-    console.error("Error creating PDF:", error);
-    throw error;
+    doc.text(
+      `PV: ${pv.pv_number} | Page ${idx + 1} of ${pvData.length}`,
+      pageWidth / 2,
+      footerY,
+      {
+        align: "center",
+      },
+    );
   }
+
+  // If no PVs found, show message page
+  if (pvData.length === 0) {
+    doc.setFontSize(14);
+    doc.setTextColor(150, 150, 150);
+    doc.text(
+      "No Payment Vouchers found for the selected period",
+      pageWidth / 2,
+      pageHeight / 2,
+      {
+        align: "center",
+      },
+    );
+  }
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="pvs-report-${new Date().toISOString().split("T")[0]}.pdf"`,
+  );
+  res.send(Buffer.from(doc.output("arraybuffer")));
 };
 
 // School Settings Controllers
@@ -14720,4 +15242,5 @@ module.exports = {
 
   getEmailLogs,
   getEmailStats,
+  exportPVHeaders
 };

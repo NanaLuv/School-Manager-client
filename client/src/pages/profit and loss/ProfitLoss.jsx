@@ -31,7 +31,7 @@ const ProfitLoss = () => {
 
   // Filters
   const [startDate, setStartDate] = useState(
-    new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   );
   const [endDate, setEndDate] = useState(new Date());
   const [period, setPeriod] = useState("monthly");
@@ -74,6 +74,7 @@ const ProfitLoss = () => {
         throw new Error("Invalid response from server");
       }
       setPlData(plResponse.data);
+      console.log("Fetched P&L data:", plResponse.data);
       setTrends(trendsResponse.data);
 
       // Load charts after data is ready
@@ -134,7 +135,7 @@ const ProfitLoss = () => {
 
       // Show error message to user
       alert(
-        `Failed to load financial data: ${error.message}. Showing sample data.`
+        `Failed to load financial data: ${error.message}. Showing sample data.`,
       );
     } finally {
       setLoading(false);
@@ -173,13 +174,10 @@ const ProfitLoss = () => {
         end_date: endDate.toISOString().split("T")[0],
       };
 
-      const response = await api.get(
-        "/finance/profit-loss/export",
-        {
-          params,
-          responseType: "blob",
-        }
-      );
+      const response = await api.get("/finance/profit-loss/export", {
+        params,
+        responseType: "blob",
+      });
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
@@ -188,7 +186,7 @@ const ProfitLoss = () => {
         "download",
         `profit-loss-${startDate.toISOString().split("T")[0]}-to-${
           endDate.toISOString().split("T")[0]
-        }.${format}`
+        }.${format}`,
       );
       document.body.appendChild(link);
       link.click();
@@ -434,7 +432,7 @@ const ProfitLoss = () => {
             <div className="flex justify-between mt-1">
               <span className="text-gray-600">Operating</span>
               <span className="font-medium">
-                {formatCurrency(plData.expenditure.expenses.total)}
+                {formatCurrency(plData.expenditure.pv_expenses.total)}
               </span>
             </div>
           </div>
@@ -884,7 +882,7 @@ const ProfitLoss = () => {
           <div className="p-3 bg-blue-50 rounded-lg">
             <p className="text-sm text-gray-600">Payroll to Income Ratio</p>
             <p className="text-xl font-bold text-blue-700">
-              {plData.metrics.efficiency.payroll_percentage.toFixed(2)}%
+              {plData.metrics.efficiency.payroll_percentage}%
             </p>
             <p className="text-xs text-gray-500 mt-1">
               {plData.expenditure.payroll.staff} staff members
