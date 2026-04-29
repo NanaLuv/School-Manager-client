@@ -68,30 +68,41 @@ const getSchoolSettingsForEmail = async () => {
 };
 
 const createTransporter = () => {
-  // Check if we're in development mode
-  // if (process.env.NODE_ENV === "development" && !process.env.EMAIL_USER) {
-  //   // Use Ethereal for development (fake emails)
-  //   return nodemailer.createTransport({
-  //     host: "smtp.ethereal.email",
-  //     port: 587,
-  //     secure: false,
-  //     auth: {
-  //       user: process.env.ETHEREAL_USER,
-  //       pass: process.env.ETHEREAL_PASS
-  //     },
-  //   });
-  // }
+  const host = process.env.EMAIL_HOST;
+  const port = parseInt(process.env.EMAIL_PORT || "587", 10);
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
 
-  // Use Gmail for production
+  // Warn early if required variables are missing so the issue is obvious in logs
+  if (!host) {
+    console.warn(
+      "[emailServices] WARNING: EMAIL_HOST is not set. SMTP connection will likely fail."
+    );
+  }
+  if (!user || !pass) {
+    console.warn(
+      "[emailServices] WARNING: EMAIL_USER or EMAIL_PASS is not set. Authentication will fail."
+    );
+  }
+
+  // Port 465 is the legacy SSL port and requires secure: true.
+  // All other ports (587 STARTTLS, 25 plain) use secure: false.
+  const secure = port === 465;
+
+  console.log(
+    `[emailServices] Creating SMTP transporter — host: ${host}, port: ${port}, secure: ${secure}, user: ${user}`
+  );
+
   return nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
+    host,
+    port,
+    secure,
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+      user,
+      pass,
     },
     tls: {
+      // Allow self-signed certificates on custom mail servers
       rejectUnauthorized: false,
     },
   });
