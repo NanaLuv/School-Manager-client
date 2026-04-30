@@ -1,4 +1,4 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 const pool = require("../db");
 
 
@@ -68,26 +68,15 @@ const getSchoolSettingsForEmail = async () => {
 };
 
 const createTransporter = () => {
-  const host = process.env.EMAIL_HOST;
-  const port = parseInt(process.env.EMAIL_PORT || "587", 10);
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_PASS;
+  const apiKey = process.env.RESEND_API_KEY;
 
-  // Warn early if required variables are missing so the issue is obvious in logs
-  if (!host) {
+  if (!apiKey) {
     console.warn(
-      "[emailServices] WARNING: EMAIL_HOST is not set. SMTP connection will likely fail."
-    );
-  }
-  if (!user || !pass) {
-    console.warn(
-      "[emailServices] WARNING: EMAIL_USER or EMAIL_PASS is not set. Authentication will fail."
+      "[emailServices] WARNING: RESEND_API_KEY is not set. Email sending will fail."
     );
   }
 
-  // Port 465 is the legacy SSL port and requires secure: true.
-  // All other ports (587 STARTTLS, 25 plain) use secure: false.
-  const secure = port === 465;
+  console.log("[emailServices] Creating Resend client (HTTP-based)");
 
   console.log(
     `[emailServices] Creating SMTP transporter — host: ${host}, port: ${port}, secure: ${secure}, user: ${user}`
@@ -105,6 +94,7 @@ const createTransporter = () => {
       rejectUnauthorized: false,
     },
   });
+  return new Resend(apiKey);
 };
 
 // Send payment receipt email
@@ -160,8 +150,8 @@ const sendPaymentReceipt = async (paymentData, studentData, receiptNumber) => {
 
     // Send email if email exists
     if (parentEmail) {
-      const mailOptions = {
-        from: `"${schoolSettings.school_name}" <${process.env.EMAIL_FROM || "noreply@school.edu"}>`,
+      const { data, error } = await transporter.emails.send({
+        from: `${schoolSettings.school_name} <${process.env.EMAIL_FROM || "noreply@school.edu"}>`,
         to: parentEmail,
         subject: `Payment Receipt - ${receiptNumber}`,
         html: generatePaymentEmailHTML(
@@ -170,12 +160,15 @@ const sendPaymentReceipt = async (paymentData, studentData, receiptNumber) => {
           receiptNumber,
           schoolSettings,
         ),
-      };
+      });
 
-      const info = await transporter.sendMail(mailOptions);
-      console.log("Email sent:", info.messageId);
-
-      emailResult = { success: true, messageId: info.messageId };
+      if (error) {
+        console.error("Resend error (payment receipt):", error);
+        emailResult = { success: false, error: error.message };
+      } else {
+        console.log("Email sent via Resend:", data.id);
+        emailResult = { success: true, messageId: data.id };
+      }
     } else {
       console.log("No email found for parent/student");
     }
@@ -438,7 +431,7 @@ const sendBalanceReminder = async (
   schoolSettings,
 ) => {
   try {
-    const transporter = await createTransporter();
+    const transporter = createTransporter();
 
     let parentEmail = studentData.parent_email || studentData.student_email;
 
@@ -454,8 +447,8 @@ const sendBalanceReminder = async (
       };
     }
 
-    const mailOptions = {
-      from: `"${schoolSettings.school_name}" <${process.env.EMAIL_USER}>`,
+    const { data, error } = await transporter.emails.send({
+      from: `${schoolSettings.school_name} <${process.env.EMAIL_FROM || "noreply@school.edu"}>`,
       to: parentEmail,
       subject: `Fee Balance Reminder - ${studentData.first_name} ${studentData.last_name}`,
       html: generateBalanceReminderHTML(
@@ -463,18 +456,17 @@ const sendBalanceReminder = async (
         balanceData,
         schoolSettings,
       ),
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    let previewUrl = null;
-    if (nodemailer.getTestMessageUrl) {
-      previewUrl = nodemailer.getTestMessageUrl(info);
+    if (error) {
+      console.error("Resend error (balance reminder):", error);
+      return { success: false, error: error.message };
     }
 
+    console.log("Balance reminder sent via Resend:", data.id);
     return {
       success: true,
-      messageId: info.messageId,
-      previewUrl,
+      messageId: data.id,
     };
   } catch (error) {
     console.error("Error sending reminder email:", error);
