@@ -102,7 +102,6 @@ const createTransporter = () => {
       pass,
     },
     tls: {
-      // Allow self-signed certificates on custom mail servers
       rejectUnauthorized: false,
     },
   });
