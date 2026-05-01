@@ -78,22 +78,6 @@ const createTransporter = () => {
 
   console.log("[emailServices] Creating Resend client (HTTP-based)");
 
-  console.log(
-    `[emailServices] Creating SMTP transporter — host: ${host}, port: ${port}, secure: ${secure}, user: ${user}`
-  );
-
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: {
-      user,
-      pass,
-    },
-    tls: {
-      rejectUnauthorized: false,
-    },
-  });
   return new Resend(apiKey);
 };
 
