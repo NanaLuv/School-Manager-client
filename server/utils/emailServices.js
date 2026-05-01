@@ -135,7 +135,7 @@ const sendPaymentReceipt = async (paymentData, studentData, receiptNumber) => {
     // Send email if email exists
     if (parentEmail) {
       const { data, error } = await transporter.emails.send({
-        from: `${schoolSettings.school_name} <${process.env.EMAIL_FROM || "noreply@school.edu"}>`,
+        from: `${process.env.EMAIL_FROM || "lovenana961@gmail.com"}`,
         to: parentEmail,
         subject: `Payment Receipt - ${receiptNumber}`,
         html: generatePaymentEmailHTML(
