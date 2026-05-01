@@ -689,9 +689,8 @@
 //   sendBalanceReminder,
 // };
 
-const nodemailer = require("nodemailer");
+const SibApiV3Sdk = require("sib-api-v3-sdk");
 const pool = require("../db");
-const Brevo = require("@getbrevo/brevo")
 
 // Function to get school settings
 const getSchoolSettingsForEmail = async () => {
@@ -757,37 +756,20 @@ const getSchoolSettingsForEmail = async () => {
   }
 };
 
-// Create Nodemailer transporter using Brevo SMTP
-// const createTransporter = () => {
-//   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-//     console.warn(
-//       "[emailServices] WARNING: SMTP_USER or SMTP_PASS is not set. Email sending will fail.",
-//     );
-//   }
-
-//   console.log("[emailServices] Creating Nodemailer transporter via Brevo SMTP");
-
-//   return nodemailer.createTransport({
-//     host: process.env.SMTP_HOST || "smtp-relay.brevo.com",
-//     port: parseInt(process.env.SMTP_PORT) || 587,
-//     secure: false, // false for port 587
-//     auth: {
-//       user: process.env.SMTP_USER,
-//       pass: process.env.SMTP_PASS,
-//     },
-//   });
-// };
-
+// Create Brevo HTTP API client (avoids SMTP port blocks on Railway)
 const createTransporter = () => {
   if (!process.env.BREVO_API_KEY) {
-    console.warn("[emailServices] WARNING: BREVO_API_KEY is not set.");
+    console.warn(
+      "[emailServices] WARNING: BREVO_API_KEY is not set. Email sending will fail.",
+    );
   }
 
-  const client = new Brevo.TransactionalEmailsApi();
-  client.authentications["api-key"].apiKey = process.env.BREVO_API_KEY;
-
   console.log("[emailServices] Creating Brevo HTTP API client");
-  return client;
+
+  const defaultClient = SibApiV3Sdk.ApiClient.instance;
+  defaultClient.authentications["api-key"].apiKey = process.env.BREVO_API_KEY;
+
+  return new SibApiV3Sdk.TransactionalEmailsApi();
 };
 
 // Send payment receipt email
@@ -808,37 +790,20 @@ const sendPaymentReceipt = async (paymentData, studentData, receiptNumber) => {
         ?.replace(/^"|"$/g, "")
         .trim();
 
-      // const info = await transporter.sendMail({
-      //   from: `${cleanSchoolName} <${process.env.EMAIL_FROM || "noreply@school.edu"}>`,
-      //   to: parentEmail,
-      //   subject: `Payment Receipt - ${receiptNumber}`,
-      //   html: generatePaymentEmailHTML(
-      //     paymentData,
-      //     studentData,
-      //     receiptNumber,
-      //     schoolSettings,
-      //   ),
-      // });
+      const info = await transporter.sendMail({
+        from: `${cleanSchoolName} <${process.env.EMAIL_FROM || "noreply@school.edu"}>`,
+        to: parentEmail,
+        subject: `Payment Receipt - ${receiptNumber}`,
+        html: generatePaymentEmailHTML(
+          paymentData,
+          studentData,
+          receiptNumber,
+          schoolSettings,
+        ),
+      });
 
-      // console.log("Email sent via Brevo:", info.messageId);
-      // emailResult = { success: true, messageId: info.messageId };
-      const sendSmtpEmail = new Brevo.SendSmtpEmail();
-      sendSmtpEmail.sender = {
-        name: cleanSchoolName,
-        email: process.env.EMAIL_FROM,
-      };
-      sendSmtpEmail.to = [{ email: parentEmail }];
-      sendSmtpEmail.subject = `Payment Receipt - ${receiptNumber}`;
-      sendSmtpEmail.htmlContent = generatePaymentEmailHTML(
-        paymentData,
-        studentData,
-        receiptNumber,
-        schoolSettings,
-      );
-
-      const response = await transporter.sendTransacEmail(sendSmtpEmail);
-      console.log("Email sent via Brevo API:", response.body.messageId);
-      emailResult = { success: true, messageId: response.body.messageId };
+      console.log("Email sent via Brevo:", info.messageId);
+      emailResult = { success: true, messageId: info.messageId };
     } else {
       console.log("No email found for parent/student");
     }
@@ -1119,42 +1084,22 @@ const sendBalanceReminder = async (
       ?.replace(/^"|"$/g, "")
       .trim();
 
-    // const info = await transporter.sendMail({
-    //   from: `${cleanSchoolName} <${process.env.EMAIL_FROM || "noreply@school.edu"}>`,
-    //   to: parentEmail,
-    //   subject: `Fee Balance Reminder - ${studentData.first_name} ${studentData.last_name}`,
-    //   html: generateBalanceReminderHTML(
-    //     studentData,
-    //     balanceData,
-    //     schoolSettings,
-    //   ),
-    // });
+    const info = await transporter.sendMail({
+      from: `${cleanSchoolName} <${process.env.EMAIL_FROM || "noreply@school.edu"}>`,
+      to: parentEmail,
+      subject: `Fee Balance Reminder - ${studentData.first_name} ${studentData.last_name}`,
+      html: generateBalanceReminderHTML(
+        studentData,
+        balanceData,
+        schoolSettings,
+      ),
+    });
 
-    // console.log("Balance reminder sent via Brevo:", info.messageId);
-    // return {
-    //   success: true,
-    //   messageId: info.messageId,
-    // };
-
-    const sendSmtpEmail = new Brevo.SendSmtpEmail();
-    sendSmtpEmail.sender = {
-      name: cleanSchoolName,
-      email: process.env.EMAIL_FROM,
+    console.log("Balance reminder sent via Brevo:", info.messageId);
+    return {
+      success: true,
+      messageId: info.messageId,
     };
-    sendSmtpEmail.to = [{ email: parentEmail }];
-    sendSmtpEmail.subject = `Fee Balance Reminder - ${studentData.first_name} ${studentData.last_name}`;
-    sendSmtpEmail.htmlContent = generateBalanceReminderHTML(
-      studentData,
-      balanceData,
-      schoolSettings,
-    );
-
-    const response = await transporter.sendTransacEmail(sendSmtpEmail);
-    console.log(
-      "Balance reminder sent via Brevo API:",
-      response.body.messageId,
-    );
-    return { success: true, messageId: response.body.messageId };
   } catch (error) {
     console.error("Error sending reminder email:", error);
     return { success: false, error: error.message };
