@@ -136,7 +136,7 @@ const sendPaymentReceipt = async (paymentData, studentData, receiptNumber) => {
         ?.replace(/^"|"$/g, "")
         .trim();
       const { data, error } = await transporter.emails.send({
-        from: `${cleanSchoolName} <${process.env.EMAIL_FROM || "noreply@school.edu"}>`,
+        from: `${cleanSchoolName} <lovenana961@gmail.com>`,
         to: parentEmail,
         subject: `Payment Receipt - ${receiptNumber}`,
         html: generatePaymentEmailHTML(
