@@ -1,7 +1,6 @@
 const { Resend } = require("resend");
 const pool = require("../db");
 
-
 // Function to get school settings
 const getSchoolSettingsForEmail = async () => {
   try {
@@ -72,7 +71,7 @@ const createTransporter = () => {
 
   if (!apiKey) {
     console.warn(
-      "[emailServices] WARNING: RESEND_API_KEY is not set. Email sending will fail."
+      "[emailServices] WARNING: RESEND_API_KEY is not set. Email sending will fail.",
     );
   }
 
@@ -109,7 +108,6 @@ const createTransporter = () => {
 //     const info = await transporter.sendMail(mailOptions);
 //     console.log("Email sent:", info.messageId);
 
-
 //     return {
 //       success: true,
 //       messageId: info.messageId,
@@ -134,8 +132,11 @@ const sendPaymentReceipt = async (paymentData, studentData, receiptNumber) => {
 
     // Send email if email exists
     if (parentEmail) {
+      const cleanSchoolName = schoolSettings.school_name
+        ?.replace(/^"|"$/g, "")
+        .trim();
       const { data, error } = await transporter.emails.send({
-        from: `${schoolSettings.school_name} <${process.env.EMAIL_FROM || "noreply@school.edu"}>`,
+        from: `${cleanSchoolName} <${process.env.EMAIL_FROM || "noreply@school.edu"}>`,
         to: parentEmail,
         subject: `Payment Receipt - ${receiptNumber}`,
         html: generatePaymentEmailHTML(
