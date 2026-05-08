@@ -7,6 +7,12 @@ import {
   EyeIcon,
   EyeSlashIcon,
   LockClosedIcon,
+  AcademicCapIcon,
+  CurrencyDollarIcon,
+  UserGroupIcon,
+  ChartBarIcon,
+  DocumentTextIcon,
+  ComputerDesktopIcon,
 } from "@heroicons/react/24/outline";
 
 const Login = () => {
@@ -111,15 +117,92 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
-      <div className="max-w-md w-full">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-50 py-12 px-4">
+      <div className="max-w-6xl w-full grid md:grid-cols-2 gap-8 items-center">
+        {/* Left Side - App Info Section */}
+        <div className="hidden md:block space-y-6">
+          <div className="bg-white rounded-2xl shadow-xl p-8">
+            <div className="flex items-center mb-6">
+              <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center mr-4">
+                <span className="text-white text-2xl font-bold">T</span>
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Trackers</h1>
+                <p className="text-emerald-600 font-medium">
+                  School Management System
+                </p>
+              </div>
+            </div>
+
+            <p className="text-gray-600 leading-relaxed mb-6">
+              A complete school management solution that helps you track
+              students, fees, attendance, payroll, and everything in between.
+              Simple, fast, and reliable.
+            </p>
+
+            <div className="border-t border-gray-100 pt-6">
+              <h3 className="font-semibold text-gray-900 mb-4">Key Features</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center text-sm text-gray-600">
+                  <AcademicCapIcon className="w-4 h-4 text-emerald-500 mr-2" />
+                  Student Management
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <CurrencyDollarIcon className="w-4 h-4 text-emerald-500 mr-2" />
+                  Fee Tracking
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <UserGroupIcon className="w-4 h-4 text-emerald-500 mr-2" />
+                  Staff Payroll
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <ChartBarIcon className="w-4 h-4 text-emerald-500 mr-2" />
+                  Reports & Analytics
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <DocumentTextIcon className="w-4 h-4 text-emerald-500 mr-2" />
+                  Attendance Tracking
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <ComputerDesktopIcon className="w-4 h-4 text-emerald-500 mr-2" />
+                  Easy to Use
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Testimonial or Stats */}
+          <div className="bg-emerald-600 rounded-2xl shadow-xl p-6 text-white">
+            <div className="flex justify-between items-center">
+              <div className="text-center">
+                <div className="text-3xl font-bold">500+</div>
+                <div className="text-sm opacity-90">Students</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold">50+</div>
+                <div className="text-sm opacity-90">Staff</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold">100%</div>
+                <div className="text-sm opacity-90">Data Secure</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side - Login Form */}
         <div className="bg-white rounded-lg shadow-lg p-8">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-white text-2xl font-bold">S</span>
+            {/* Mobile logo - only visible on small screens */}
+            <div className="md:hidden flex justify-center mb-4">
+              <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-2xl font-bold">T</span>
+              </div>
             </div>
             <h2 className="text-3xl font-bold text-gray-900">Welcome Back</h2>
-            <p className="text-gray-600 mt-2">Sign in to your account</p>
+            <p className="text-gray-600 mt-2">
+              Sign in to your Trackers account
+            </p>
           </div>
 
           {/* Rate Limit Warning */}
@@ -256,22 +339,21 @@ const Login = () => {
           </form>
 
           {/* Forgot Password Link */}
-          <div className="mt-4 text-center">
+          {/* <div className="mt-4 text-center">
             <Link
               to="/forgot-password"
               className="text-sm text-emerald-600 hover:text-emerald-800"
             >
               Forgot your password?
             </Link>
-          </div>
+          </div> */}
 
-          {/* Last Login Info */}
-          {rateLimit.lastLogin && (
-            <div className="mt-4 text-xs text-gray-500 text-center">
-              Last successful login:{" "}
-              {new Date(rateLimit.lastLogin.last_attempt).toLocaleString()}
-            </div>
-          )}
+          {/* Demo Credentials Hint - Optional */}
+          {/* <div className="mt-6 pt-6 border-t border-gray-100">
+            <p className="text-xs text-gray-400 text-center">
+              Demo credentials available upon request
+            </p>
+          </div> */}
         </div>
       </div>
     </div>
