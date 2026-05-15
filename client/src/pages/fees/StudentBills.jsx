@@ -16,9 +16,7 @@ import {
   XMarkIcon,
   CalculatorIcon,
   CheckIcon,
-  TrashIcon,
   ExclamationTriangleIcon,
-  ChevronRightIcon as ChevronRight,
 } from "@heroicons/react/24/outline";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import { useNavigate } from "react-router-dom";
@@ -76,8 +74,8 @@ const StudentBills = () => {
   const [overpaymentsDeleted, setOverpaymentsDeleted] = useState(false);
 
   // Collapsible section state
-  const [showDeleteSection, setShowDeleteSection] = useState(false);
-  const [autoHideTimer, setAutoHideTimer] = useState(null);
+  // const [showDeleteSection, setShowDeleteSection] = useState(false);
+  // const [autoHideTimer, setAutoHideTimer] = useState(null);
 
   // Filters with debounced search
   const [filters, setFilters] = usePersistedState("studentBillsFilters", {
@@ -127,12 +125,6 @@ const StudentBills = () => {
   // Initialize data
   useEffect(() => {
     fetchInitialData();
-
-    return () => {
-      if (autoHideTimer) {
-        clearTimeout(autoHideTimer);
-      }
-    };
   }, []);
 
   // Debounced effect for filters - fetches bills when debounced filters change
@@ -546,97 +538,6 @@ const StudentBills = () => {
     }
   }, []);
 
-  // Delete all arrears
-  const handleDeleteAllArrears = async () => {
-    if (
-      !window.confirm(
-        "Are you sure you want to delete ALL student arrears records? This action cannot be undone!",
-      )
-    ) {
-      return;
-    }
-
-    setDeletingArrears(true);
-    try {
-      const response = await api.delete("/student-arrears");
-
-      if (response.data.success) {
-        showMessage(
-          `✅ Successfully deleted ${response.data.deletedCount} arrears records`,
-        );
-        setArrearsDeleted(true);
-
-        // Clear arrears from local state
-        setStudentArrears({});
-
-        // Refresh bills to update totals
-        fetchBills();
-
-        // Auto-hide section after successful deletion
-        setTimeout(() => {
-          setShowDeleteSection(false);
-        }, 3000);
-      } else {
-        showMessage(response.data.error || "Failed to delete arrears", true);
-      }
-    } catch (error) {
-      console.error("Error deleting arrears:", error);
-      showMessage(
-        error.response?.data?.error || "Error deleting arrears",
-        true,
-      );
-    } finally {
-      setDeletingArrears(false);
-    }
-  };
-
-  // Delete all overpayments
-  const handleDeleteAllOverpayments = async () => {
-    if (
-      !window.confirm(
-        "Are you sure you want to delete ALL student overpayments records? This action cannot be undone!",
-      )
-    ) {
-      return;
-    }
-
-    setDeletingOverpayments(true);
-    try {
-      const response = await api.delete("/student-overpayments");
-
-      if (response.data.success) {
-        showMessage(
-          `✅ Successfully deleted ${response.data.deletedCount} overpayment records`,
-        );
-        setOverpaymentsDeleted(true);
-
-        // Clear overpayments from local state
-        setStudentOverpayments({});
-
-        // Refresh bills to update totals
-        fetchBills();
-
-        // Auto-hide section after successful deletion
-        setTimeout(() => {
-          setShowDeleteSection(false);
-        }, 3000);
-      } else {
-        showMessage(
-          response.data.error || "Failed to delete overpayments",
-          true,
-        );
-      }
-    } catch (error) {
-      console.error("Error deleting overpayments:", error);
-      showMessage(
-        error.response?.data?.error || "Error deleting overpayments",
-        true,
-      );
-    } finally {
-      setDeletingOverpayments(false);
-    }
-  };
-
   // Clear all filters
   const clearAllFilters = useCallback(() => {
     setFilters({
@@ -946,7 +847,6 @@ const StudentBills = () => {
           </div>
         </div>
       )}
-
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
@@ -993,9 +893,8 @@ const StudentBills = () => {
           </button>
         </div>
       </div>
-
       {/* Delete Section */}
-      {showDeleteSection && (
+      {/* {showDeleteSection && (
         <div className="mb-6 bg-red-50 border border-red-200 rounded-lg overflow-hidden">
           <div className="flex justify-between items-center p-4 bg-red-100">
             <div className="flex items-center">
@@ -1121,8 +1020,7 @@ const StudentBills = () => {
             </div>
           </div>
         </div>
-      )}
-
+      )} */}
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow border mb-6">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -1310,6 +1208,128 @@ const StudentBills = () => {
         </div>
       </div>
 
+      {/* Pagination Controls*/}
+      <div className="mt-6 flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 rounded-lg shadow">
+        <div className="flex flex-1 justify-between sm:hidden">
+          <button
+            onClick={() => handlePageChange(pagination.page - 1)}
+            disabled={!pagination.hasPrevPage}
+            className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+          <button
+            onClick={() => handlePageChange(pagination.page + 1)}
+            disabled={!pagination.hasNextPage}
+            className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+
+        <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm text-gray-700">
+              Showing{" "}
+              <span className="font-medium">
+                {(pagination.page - 1) * pagination.limit + 1}
+              </span>{" "}
+              to{" "}
+              <span className="font-medium">
+                {Math.min(pagination.page * pagination.limit, pagination.total)}
+              </span>{" "}
+              of <span className="font-medium">{pagination.total}</span>{" "}
+              students
+            </p>
+          </div>
+          <div>
+            <nav
+              className="isolate inline-flex -space-x-px rounded-md shadow-sm"
+              aria-label="Pagination"
+            >
+              <button
+                onClick={() => handlePageChange(1)}
+                disabled={!pagination.hasPrevPage}
+                className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="sr-only">First</span>«
+              </button>
+              <button
+                onClick={() => handlePageChange(pagination.page - 1)}
+                disabled={!pagination.hasPrevPage}
+                className="relative inline-flex items-center px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="sr-only">Previous</span>‹
+              </button>
+
+              {/* Page Numbers */}
+              {Array.from(
+                { length: Math.min(5, pagination.totalPages) },
+                (_, i) => {
+                  let pageNum;
+                  if (pagination.totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (pagination.page <= 3) {
+                    pageNum = i + 1;
+                  } else if (pagination.page >= pagination.totalPages - 2) {
+                    pageNum = pagination.totalPages - 4 + i;
+                  } else {
+                    pageNum = pagination.page - 2 + i;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
+                        pagination.page === pageNum
+                          ? "bg-emerald-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+                          : "text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                },
+              )}
+
+              <button
+                onClick={() => handlePageChange(pagination.page + 1)}
+                disabled={!pagination.hasNextPage}
+                className="relative inline-flex items-center px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="sr-only">Next</span>›
+              </button>
+              <button
+                onClick={() => handlePageChange(pagination.totalPages)}
+                disabled={!pagination.hasNextPage}
+                className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="sr-only">Last</span>»
+              </button>
+            </nav>
+          </div>
+        </div>
+      </div>
+      {/* Items per page selector */}
+      <div className="mt-4 flex justify-end items-center space-x-2">
+        <label className="text-sm text-gray-600">Show:</label>
+        <select
+          value={pagination.limit}
+          onChange={(e) => {
+            const newLimit = parseInt(e.target.value);
+            setPagination((prev) => ({ ...prev, limit: newLimit, page: 1 }));
+            fetchBills(1);
+          }}
+          className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        >
+          <option value={10}>10 per page</option>
+          <option value={20}>20 per page</option>
+          <option value={50}>50 per page</option>
+          <option value={100}>100 per page</option>
+        </select>
+      </div>
+
       {/* Student List */}
       <div className="space-y-4">
         {filteredStudents.length > 0 ? (
@@ -1337,7 +1357,6 @@ const StudentBills = () => {
           />
         )}
       </div>
-
       {/* Bill Preview Modal */}
       <BillPreview preview={previewBill} onClose={handleClosePreview} />
     </div>

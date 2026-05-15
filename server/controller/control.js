@@ -6877,173 +6877,280 @@ const calculateStudentPaymentStatus = (finalizedBill, bills) => {
   }
 };
 
-//student bill controllers
-// GET /api/student-bills - Get student bills with filters AND PAGINATION
+
+// GET /api/getstudentbills - Get student bills with pagination
 const getStudentBills = async (req, res) => {
   try {
     const {
       class_id,
       academic_year_id,
       term_id,
-      student_id,
       status,
-      active_only,
+      active_only = "true",
       page = 1,
       limit = 20,
     } = req.query;
 
-    let whereConditions = ["1=1"];
-    let queryParams = [];
-
-    if (active_only === "true") {
-      whereConditions.push("(s.is_active IS NULL OR s.is_active = TRUE)");
-    }
-
-    if (class_id) {
-      whereConditions.push(`
-        b.student_id IN (
-          SELECT student_id FROM class_assignments 
-          WHERE class_id = ? AND academic_year_id = COALESCE(?, ca.academic_year_id)
-        )
-      `);
-      queryParams.push(class_id);
-      if (academic_year_id) {
-        queryParams.push(academic_year_id);
-      }
-    }
-
-    if (academic_year_id) {
-      whereConditions.push("bt.academic_year_id = ?");
-      queryParams.push(academic_year_id);
-    }
-
-    if (term_id) {
-      whereConditions.push("bt.term_id = ?");
-      queryParams.push(term_id);
-    }
-
-    if (student_id) {
-      whereConditions.push("b.student_id = ?");
-      queryParams.push(student_id);
-    }
-
-    // Calculate offset for pagination
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    // FIRST: Get total count for pagination
+    // Build WHERE conditions for students
+    let studentWhereConditions = ["1=1"];
+    let queryParams = [];
+
+    // Class filter
+    if (class_id && class_id !== "") {
+      studentWhereConditions.push("ca.class_id = ?");
+      queryParams.push(class_id);
+    }
+
+    // Academic year filter for class assignments
+    if (academic_year_id && academic_year_id !== "") {
+      studentWhereConditions.push("ca.academic_year_id = ?");
+      queryParams.push(academic_year_id);
+    }
+
+    // Active only filter
+    if (active_only === "true") {
+      studentWhereConditions.push("(s.is_active IS NULL OR s.is_active = TRUE)");
+    }
+
+    // ========== STEP 1: Get total count of UNIQUE students ==========
     const [countResult] = await pool.query(
-      `
-      SELECT COUNT(DISTINCT s.id) as total
-      FROM bills b
-      LEFT JOIN bill_templates bt ON b.bill_template_id = bt.id
-      LEFT JOIN students s ON b.student_id = s.id
-      LEFT JOIN class_assignments ca ON s.id = ca.student_id AND bt.academic_year_id = ca.academic_year_id
-      LEFT JOIN classes c ON ca.class_id = c.id
-      LEFT JOIN academic_years ay ON bt.academic_year_id = ay.id
-      LEFT JOIN terms t ON bt.term_id = t.id
-      LEFT JOIN fee_categories fc ON bt.fee_category_id = fc.id
-      LEFT JOIN student_term_bills stb ON (
-        s.id = stb.student_id AND 
-        bt.academic_year_id = stb.academic_year_id AND 
-        bt.term_id = stb.term_id AND
-        stb.is_finalized = TRUE
-      )
-      WHERE ${whereConditions.join(" AND ")}
-      `,
-      queryParams,
+      `SELECT COUNT(DISTINCT s.id) as total
+       FROM students s
+       INNER JOIN class_assignments ca ON s.id = ca.student_id
+       WHERE ${studentWhereConditions.join(" AND ")}`,
+      queryParams
     );
 
     const total = countResult[0].total;
     const totalPages = Math.ceil(total / limitNum);
 
-    // SECOND: Get paginated student bills
-    const [bills] = await pool.query(
-      `
-      SELECT 
-        b.*,
-        bt.description,
-        bt.is_compulsory,
-        bt.academic_year_id,
-        bt.term_id,
-        s.first_name,
-        s.last_name,
-        s.admission_number,
-        s.is_active,
-        c.class_name,
-        c.id as class_id,
-        ay.year_label as academic_year,
-        t.term_name,
-        fc.category_name,
-        stb.id as finalized_bill_id,
-        stb.total_amount as finalized_total,
-        stb.paid_amount as finalized_paid,
-        stb.remaining_balance as finalized_balance,
-        stb.is_fully_paid as finalized_fully_paid,
-        stb.selected_bills as finalized_selected_bills
-      FROM bills b
-      LEFT JOIN bill_templates bt ON b.bill_template_id = bt.id
-      LEFT JOIN students s ON b.student_id = s.id
-      LEFT JOIN class_assignments ca ON s.id = ca.student_id AND bt.academic_year_id = ca.academic_year_id
-      LEFT JOIN classes c ON ca.class_id = c.id
-      LEFT JOIN academic_years ay ON bt.academic_year_id = ay.id
-      LEFT JOIN terms t ON bt.term_id = t.id
-      LEFT JOIN fee_categories fc ON bt.fee_category_id = fc.id
-      LEFT JOIN student_term_bills stb ON (
-        s.id = stb.student_id AND 
-        bt.academic_year_id = stb.academic_year_id AND 
-        bt.term_id = stb.term_id AND
-        stb.is_finalized = TRUE
-      )
-      WHERE ${whereConditions.join(" AND ")}
-      GROUP BY s.id, b.id
-      ORDER BY s.first_name, s.last_name, b.due_date ASC
-      LIMIT ? OFFSET ?
-      `,
-      [...queryParams, limitNum, offset],
+    // ========== STEP 2: Get paginated students ==========
+    const [paginatedStudents] = await pool.query(
+      `SELECT DISTINCT
+         s.id as student_id,
+         s.first_name,
+         s.last_name,
+         s.admission_number,
+         c.class_name,
+         c.id as class_id
+       FROM students s
+       INNER JOIN class_assignments ca ON s.id = ca.student_id
+       INNER JOIN classes c ON ca.class_id = c.id
+       WHERE ${studentWhereConditions.join(" AND ")}
+       ORDER BY s.first_name, s.last_name
+       LIMIT ? OFFSET ?`,
+      [...queryParams, limitNum, offset]
     );
 
-    // Process bills to apply edited amounts
-    const processedBills = bills.map((bill) => {
-      let finalBill = { ...bill };
+    // If no students found, return empty result
+    if (paginatedStudents.length === 0) {
+      return res.json({
+        success: true,
+        bills: [],
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+      });
+    }
 
-      if (
-        bill.finalized_selected_bills &&
-        typeof bill.finalized_selected_bills === "string"
-      ) {
-        try {
-          const selectedBillsData = JSON.parse(bill.finalized_selected_bills);
-          const editedAmounts = selectedBillsData.edited_amounts || {};
+    // ========== STEP 3: Get bills for these specific students ==========
+    const studentIds = paginatedStudents.map(s => s.student_id);
+    const placeholders = studentIds.map(() => "?").join(",");
 
-          if (editedAmounts[bill.id]) {
-            finalBill.finalized_amount = editedAmounts[bill.id];
-            finalBill.amount = editedAmounts[bill.id];
-            finalBill.has_custom_amount = true;
-            finalBill.original_amount = bill.amount;
+    // Build bill query conditions
+    let billConditions = [`b.student_id IN (${placeholders})`];
+    let billParams = [...studentIds];
+
+    if (academic_year_id && academic_year_id !== "") {
+      billConditions.push("bt.academic_year_id = ?");
+      billParams.push(academic_year_id);
+    }
+
+    if (term_id && term_id !== "") {
+      billConditions.push("bt.term_id = ?");
+      billParams.push(term_id);
+    }
+
+    if (status && status !== "all") {
+      billConditions.push("b.payment_status = ?");
+      billParams.push(status);
+    }
+
+    const [bills] = await pool.query(
+      `SELECT 
+         b.id,
+         b.student_id,
+         b.amount,
+         b.due_date,
+         b.status as bill_status,
+         b.paid_amount,
+         b.remaining_amount,
+         b.payment_status,
+         b.description as bill_description,
+         b.created_at,
+         bt.id as template_id,
+         bt.is_compulsory,
+         bt.description as template_description,
+         bt.academic_year_id,
+         bt.term_id,
+         fc.id as fee_category_id,
+         fc.category_name,
+         s.first_name,
+         s.last_name,
+         s.admission_number,
+         c.class_name
+       FROM bills b
+       INNER JOIN bill_templates bt ON b.bill_template_id = bt.id
+       INNER JOIN fee_categories fc ON bt.fee_category_id = fc.id
+       INNER JOIN students s ON b.student_id = s.id
+       INNER JOIN class_assignments ca ON s.id = ca.student_id
+       INNER JOIN classes c ON ca.class_id = c.id
+       WHERE ${billConditions.join(" AND ")}
+       ORDER BY s.first_name, s.last_name, b.due_date ASC`,
+      billParams
+    );
+
+    // ========== STEP 4: Get finalized term bills for these students ==========
+    let termBillsMap = {};
+    if (academic_year_id && term_id) {
+      const [termBills] = await pool.query(
+        `SELECT 
+           student_id,
+           id as term_bill_id,
+           total_amount,
+           paid_amount,
+           remaining_balance,
+           is_fully_paid,
+           selected_bills,
+           compulsory_amount,
+           optional_amount
+         FROM student_term_bills
+         WHERE student_id IN (${placeholders})
+           AND academic_year_id = ?
+           AND term_id = ?
+           AND is_finalized = TRUE`,
+        [...studentIds, academic_year_id, term_id]
+      );
+
+      // Create map for quick lookup
+      termBillsMap = termBills.reduce((acc, tb) => {
+        acc[tb.student_id] = tb;
+        return acc;
+      }, {});
+    }
+
+    // ========== STEP 5: Build response with calculated totals ==========
+    const responseBills = bills.map(bill => {
+      const termBill = termBillsMap[bill.student_id];
+      let finalAmount = parseFloat(bill.amount);
+      let isSelected = true;
+      
+      // Check if this bill is in the finalized term bill
+      if (termBill && termBill.selected_bills) {
+        let selectedData = termBill.selected_bills;
+        if (typeof selectedData === "string") {
+          try {
+            selectedData = JSON.parse(selectedData);
+          } catch (e) {
+            selectedData = { bill_ids: [] };
           }
-        } catch (e) {
-          console.error("Error parsing selected_bills:", e);
+        }
+        
+        const selectedBillIds = selectedData.bill_ids || [];
+        const editedAmounts = selectedData.edited_amounts || {};
+        
+        isSelected = selectedBillIds.includes(bill.id);
+        
+        if (isSelected && editedAmounts[bill.id]) {
+          finalAmount = parseFloat(editedAmounts[bill.id]);
         }
       }
-
-      return finalBill;
+      
+      return {
+        ...bill,
+        finalAmount,
+        isSelected,
+        hasCustomAmount: finalAmount !== parseFloat(bill.amount),
+        originalAmount: parseFloat(bill.amount),
+        status: bill.payment_status || "Pending",
+      };
     });
 
+    // Group bills by student for easier frontend consumption
+    const groupedByStudent = {};
+    responseBills.forEach(bill => {
+      if (!groupedByStudent[bill.student_id]) {
+        groupedByStudent[bill.student_id] = {
+          student: {
+            id: bill.student_id,
+            name: `${bill.first_name} ${bill.last_name}`,
+            admission_number: bill.admission_number,
+            class_name: bill.class_name,
+          },
+          bills: [],
+          finalizedBill: termBillsMap[bill.student_id] || null,
+        };
+      }
+      groupedByStudent[bill.student_id].bills.push(bill);
+    });
+
+    // Flatten back to array for response
+    const flatBills = Object.values(groupedByStudent).flatMap(group => 
+      group.bills.map(bill => ({
+        ...bill,
+        student_name: group.student.name,
+        student_admission: group.student.admission_number,
+        class_name: group.student.class_name,
+        has_finalized_bill: !!group.finalizedBill,
+        finalized_bill_total: group.finalizedBill?.total_amount || null,
+        finalized_bill_paid: group.finalizedBill?.paid_amount || null,
+        finalized_bill_balance: group.finalizedBill?.remaining_balance || null,
+      }))
+    );
+
+    // ========== STEP 6: Return paginated response ==========
     res.json({
-      bills: processedBills,
+      success: true,
+      bills: flatBills,
       pagination: {
         page: pageNum,
         limit: limitNum,
-        total,
-        totalPages,
+        total: total,
+        totalPages: totalPages,
         hasNextPage: pageNum < totalPages,
         hasPrevPage: pageNum > 1,
+        startIndex: offset + 1,
+        endIndex: Math.min(offset + limitNum, total),
       },
+      filters: {
+        class_id: class_id || null,
+        academic_year_id: academic_year_id || null,
+        term_id: term_id || null,
+        status: status || "all",
+        active_only: active_only === "true",
+      },
+      summary: {
+        students_in_page: paginatedStudents.length,
+        total_students_with_bills: total,
+        total_bills_in_page: flatBills.length,
+      },
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     console.error("Error fetching student bills:", error);
-    res.status(500).json({ error: "Failed to fetch student bills" });
+    res.status(500).json({ 
+      error: "Failed to fetch student bills",
+      details: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
   }
 };
 
